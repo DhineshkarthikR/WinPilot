@@ -74,12 +74,15 @@ function Initialize-WinPilotConsole {
     }
     catch {
         # Fall back gracefully if host blocks encoding reassignment
+        $null = $_
     }
 
     # Enable virtual terminal processing for Windows 10/11 conhost if supported
     if ([System.Environment]::OSVersion.Version.Major -ge 10) {
         try {
-            $kernel32 = Add-Type -MemberDefinition @"
+            $helperType = "WinPilot.Native.WinPilotConsoleHelper" -as [type]
+            if (-not $helperType) {
+                $helperType = Add-Type -MemberDefinition @"
                 [DllImport("kernel32.dll", SetLastError = true)]
                 public static extern IntPtr GetStdHandle(int nStdHandle);
 
@@ -89,19 +92,21 @@ function Initialize-WinPilotConsole {
                 [DllImport("kernel32.dll", SetLastError = true)]
                 public static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
 "@ -Name "WinPilotConsoleHelper" -Namespace "WinPilot.Native" -PassThru -ErrorAction SilentlyContinue
+            }
 
-            if ($kernel32) {
-                $stdOut = $kernel32::GetStdHandle(-11) # STD_OUTPUT_HANDLE
+            if ($helperType) {
+                $stdOut = $helperType::GetStdHandle(-11) # STD_OUTPUT_HANDLE
                 $mode = 0
-                if ($kernel32::GetConsoleMode($stdOut, [ref]$mode)) {
+                if ($helperType::GetConsoleMode($stdOut, [ref]$mode)) {
                     # ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
                     $newMode = $mode -bor 0x0004
-                    [void]$kernel32::SetConsoleMode($stdOut, $newMode)
+                    [void]$helperType::SetConsoleMode($stdOut, $newMode)
                 }
             }
         }
         catch {
             # Non-critical: console will render using standard fallback colors
+            $null = $_
         }
     }
 }

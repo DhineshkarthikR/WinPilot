@@ -8,12 +8,18 @@
 #>
 
 $corePath = [System.IO.Path]::Combine($PSScriptRoot, "Core")
+$securityPath = [System.IO.Path]::Combine($PSScriptRoot, "Security")
 
 # Dot-source Core subsystem scripts in order
 . (Join-Path $corePath "Host.ps1")
 . (Join-Path $corePath "Logger.ps1")
 . (Join-Path $corePath "AnsiUI.ps1")
 . (Join-Path $corePath "Input.ps1")
+
+# Dot-source Security subsystem scripts
+. (Join-Path $securityPath "Integrity.ps1")
+. (Join-Path $securityPath "SignatureVerifier.ps1")
+. (Join-Path $securityPath "SecureBootstrapper.ps1")
 
 # Configure console and logging upon module import
 Initialize-WinPilotConsole
@@ -125,5 +131,11 @@ Export-ModuleMember -Function @(
     "Format-WinPilotBox",
     "Read-WinPilotKey",
     "Read-WinPilotChoice",
-    "Confirm-WinPilotAction"
+    "Confirm-WinPilotAction",
+    "Get-WinPilotFileHash",
+    "Test-WinPilotFileIntegrity",
+    "Test-WinPilotManifest",
+    "Get-WinPilotSignature",
+    "Test-WinPilotAuthenticode",
+    "Invoke-WinPilotSecureStage"
 )

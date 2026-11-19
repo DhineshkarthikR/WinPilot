@@ -30,8 +30,11 @@ function Get-WinPilotAnsiColor {
     <#
     .SYNOPSIS
         Returns an ANSI color sequence or empty string if ANSI is disabled.
+    .OUTPUTS
+        [string]
     #>
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory = $true)]
         [string]$ColorName
@@ -80,9 +83,10 @@ function Show-WinPilotHeader {
     Write-Host ""
     Write-Host "$($script:Ansi.BrightCyan)╔════════════════════════════════════════════════════════════════════════════╗$($script:Ansi.Reset)"
     Write-Host "$($script:Ansi.BrightCyan)║$($script:Ansi.Reset)  $($script:Ansi.Bold)$($script:Ansi.BrightWhite)WINPILOT$($script:Ansi.Reset) - Modern Windows & Office Management Architecture         $($script:Ansi.BrightCyan)║$($script:Ansi.Reset)"
-    Write-Host "$($script:Ansi.BrightCyan)║$($script:Ansi.Reset)  $($script:Ansi.Gray)$Subtitle$($script:Ansi.Reset)" + (" " * [Math]::Max(0, 74 - $Subtitle.Length)) + "$($script:Ansi.BrightCyan)║$($script:Ansi.Reset)"
+    $subPadLength = [Math]::Max(0, 74 - $Subtitle.Length)
+    $subPad = " " * $subPadLength
+    Write-Host ("$($script:Ansi.BrightCyan)║$($script:Ansi.Reset)  $($script:Ansi.Gray)$Subtitle$($script:Ansi.Reset)$subPad$($script:Ansi.BrightCyan)║$($script:Ansi.Reset)")
     Write-Host "$($script:Ansi.BrightCyan)╠════════════════════════════════════════════════════════════════════════════╣$($script:Ansi.Reset)"
-    
     $statusLine = "  Status: $adminBadge | $psBadge | $osBadge"
     Write-Host $statusLine
     Write-Host "$($script:Ansi.BrightCyan)╚════════════════════════════════════════════════════════════════════════════╝$($script:Ansi.Reset)"

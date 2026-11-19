@@ -47,7 +47,13 @@
         'Format-WinPilotBox',
         'Read-WinPilotKey',
         'Read-WinPilotChoice',
-        'Confirm-WinPilotAction'
+        'Confirm-WinPilotAction',
+        'Get-WinPilotFileHash',
+        'Test-WinPilotFileIntegrity',
+        'Test-WinPilotManifest',
+        'Get-WinPilotSignature',
+        'Test-WinPilotAuthenticode',
+        'Invoke-WinPilotSecureStage'
     )
 
     # Cmdlets to export from this module

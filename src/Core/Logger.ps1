@@ -110,7 +110,8 @@ function Write-WinPilotLog {
         [System.IO.File]::AppendAllText($script:WinPilotCurrentLogFile, "$logLine`r`n", [System.Text.Encoding]::UTF8)
     }
     catch {
-        # Silently continue if file write is locked
+        # File lock or write contention: non-fatal fallback
+        $null = $_
     }
 
     if ($MirrorToConsole) {

@@ -13,9 +13,10 @@ function Read-WinPilotKey {
     .SYNOPSIS
         Reads a single keypress from the console without echoing to screen.
     .OUTPUTS
-        [System.ConsoleKeyInfo]
+        [System.ConsoleKeyInfo] or [PSCustomObject]
     #>
     [CmdletBinding()]
+    [OutputType([System.ConsoleKeyInfo], [PSCustomObject])]
     param()
 
     try {
@@ -24,7 +25,8 @@ function Read-WinPilotKey {
         }
     }
     catch {
-        # Fallback for redirected streams or specialized test hosts
+        # Fallback when console handle is redirected or unavailable
+        $null = $_
     }
 
     $raw = Read-Host
@@ -48,8 +50,11 @@ function Read-WinPilotChoice {
         Array of valid character choices (e.g. '1','2','3','0','Q').
     .PARAMETER Prompt
         Custom prompt message.
+    .OUTPUTS
+        [char]
     #>
     [CmdletBinding()]
+    [OutputType([char])]
     param(
         [Parameter(Mandatory = $true)]
         [char[]]$ValidKeys,
@@ -71,10 +76,16 @@ function Read-WinPilotChoice {
             }
         }
 
-        # Handle ESC or Q as graceful back/exit if allowed
+        # Handle ESC as graceful back/exit if '0' or 'Q' is valid
         if ($keyInfo.Key -eq [ConsoleKey]::Escape) {
-            Write-Host "[ESC]" -ForegroundColor Yellow
-            return [char]'0'
+            if ($ValidKeys -contains '0' -or $ValidKeys -contains [char]'0') {
+                Write-Host "[ESC]" -ForegroundColor Yellow
+                return [char]'0'
+            }
+            if ($ValidKeys -contains 'Q' -or $ValidKeys -contains [char]'Q') {
+                Write-Host "[ESC]" -ForegroundColor Yellow
+                return [char]'Q'
+            }
         }
     }
 }
@@ -96,6 +107,7 @@ function Confirm-WinPilotAction {
         [bool] True if user explicitly confirms, False otherwise.
     #>
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter(Mandatory = $true)]
         [string]$ActionName,
@@ -127,7 +139,7 @@ function Confirm-WinPilotAction {
     if ($RequiresTypedConfirmation -or $RiskLevel -in @("High", "Critical")) {
         Write-Host -NoNewline "  Type 'YES' to proceed, or press Enter to cancel: " -ForegroundColor Yellow
         $response = Read-Host
-        $isConfirmed = ($response -eq "YES")
+        $isConfirmed = ($null -ne $response -and $response.Trim().ToUpperInvariant() -eq "YES")
     }
     else {
         Write-Host -NoNewline "  Proceed with this operation? [y/N]: " -ForegroundColor Yellow
