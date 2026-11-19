@@ -1,0 +1,31 @@
+# Prerequisites and Windows artifacts
+*.log
+*.tmp
+*.bak
+*~
+Thumbs.db
+Desktop.ini
+
+# Output / Build files
+/dist/
+/out/
+*.zip
+*.msi
+*.cab
+
+# PowerShell specific
+*.ps1xml
+PSScriptAnalyzerResults.xml
+TestResults.xml
+.vscode/
+.idea/
+
+# Local cache / downloaded binaries
+setup.exe
+configuration.xml
+*.iso
+*.img
+/bin/
+
+# Vercel output
+.vercel

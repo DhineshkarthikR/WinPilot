@@ -1,0 +1,36 @@
+name: WinPilot CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test on Windows (PowerShell 5.1 & PowerShell Core)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [ powershell, pwsh ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Module Manifest
+        shell: ${{ matrix.shell }}
+        run: |
+          Test-ModuleManifest -Path ./src/WinPilot.psd1
+
+      - name: Run Pester Unit Tests
+        shell: ${{ matrix.shell }}
+        run: |
+          $pester = Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 1
+          Write-Host "Using Pester version: $($pester.Version)"
+          $res = Invoke-Pester -Script ./tests/Unit/Core.Tests.ps1 -PassThru
+          if ($res.FailedCount -gt 0) {
+            Write-Error "Pester tests failed: $($res.FailedCount)"
+            exit 1
+          }
