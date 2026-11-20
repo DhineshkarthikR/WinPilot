@@ -99,6 +99,18 @@ Describe "WinPilot ODT Acquisition & Security Validation" {
         } | Should Throw
     }
 
+    It "Rejects non-approved subdomains under microsoft.com" {
+        {
+            Get-WinPilotOdt -DownloadUrl "https://unauthorized-subdomain.microsoft.com/payload.exe"
+        } | Should Throw
+    }
+
+    It "Rejects non-HTTPS download URLs" {
+        {
+            Get-WinPilotOdt -DownloadUrl "http://download.microsoft.com/officedeploymenttool.exe"
+        } | Should Throw
+    }
+
     It "Rejects unverified or unsigned setup binaries" {
         $fakeSetup = [System.IO.Path]::GetTempFileName()
         [System.IO.File]::WriteAllText($fakeSetup, "Fake Binary", [System.Text.Encoding]::UTF8)

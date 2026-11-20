@@ -125,6 +125,18 @@ Describe "WinPilot Office Update Subsystem" {
     }
 }
 
+Describe "WinPilot Office Installation Inventory" {
+    It "Get-WinPilotOfficeInstallationInventory returns expected schema properties" {
+        $inv = Get-WinPilotOfficeInstallationInventory
+        $inv | Should Not BeNullOrEmpty
+        ($inv.IsInstalled -eq $true -or $inv.IsInstalled -eq $false) | Should Be $true
+        $inv.ProductReleaseIds | Should Not BeNullOrEmpty
+        $inv.Languages | Should Not BeNullOrEmpty
+        $inv.Platform | Should Not BeNullOrEmpty
+        $inv.Version | Should Not BeNullOrEmpty
+    }
+}
+
 Describe "WinPilot Office Removal XML Generator" {
     It "Generates valid well-formed XML with <Remove All='TRUE' /> by default" {
         $xmlStr = New-WinPilotOfficeRemovalXml

@@ -40,6 +40,7 @@ Describe "WinPilot Module & Manifest Validation" {
             'Test-WinPilotManifest',
             'Get-WinPilotSignature',
             'Test-WinPilotAuthenticode',
+            'Get-WinPilotX500Attribute',
             'Invoke-WinPilotSecureStage',
             'Get-WinPilotWindowsLicense',
             'Show-WinPilotWindowsLicenseReport',
@@ -59,6 +60,7 @@ Describe "WinPilot Module & Manifest Validation" {
             'Invoke-WinPilotOfficeOnlineRepair',
             'Get-WinPilotOfficeUpdateConfig',
             'Invoke-WinPilotOfficeUpdate',
+            'Get-WinPilotOfficeInstallationInventory',
             'New-WinPilotOfficeRemovalXml',
             'Invoke-WinPilotOfficeUninstall',
             'Show-WinPilotMaintenanceMenu'

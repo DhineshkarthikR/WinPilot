@@ -8,6 +8,60 @@
     strict typed confirmation, preserves user documents and data, and logs all events.
 #>
 
+function Get-WinPilotOfficeInstallationInventory {
+    <#
+    .SYNOPSIS
+        Discovers installed Click-to-Run Office products, languages, architecture, and version.
+    .OUTPUTS
+        [PSCustomObject]
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param()
+
+    $c2rReg = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
+    if (-not (Test-Path -Path $c2rReg)) {
+        return [PSCustomObject]@{
+            IsInstalled       = $false
+            ProductReleaseIds = @()
+            Languages         = @()
+            Platform          = "Unknown"
+            Version           = "Unknown"
+            UpdateChannel     = "Unknown"
+        }
+    }
+
+    $props = Get-ItemProperty -Path $c2rReg -ErrorAction SilentlyContinue
+
+    $pids = @()
+    if ($props.ProductReleaseIds) {
+        $pids = $props.ProductReleaseIds -split "[,;]" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    }
+
+    $langs = New-Object System.Collections.Generic.List[string]
+    if ($props.ClientCulture -and $props.ClientCulture.Trim() -notin $langs) {
+        $langs.Add($props.ClientCulture.Trim())
+    }
+    if ($props.Languages) {
+        $props.Languages -split "[,;]" | ForEach-Object {
+            $l = $_.Trim()
+            if ($l -and $l -notin $langs) { $langs.Add($l) }
+        }
+    }
+    if ($langs.Count -eq 0) {
+        $langs.Add("en-us")
+    }
+
+    return [PSCustomObject]@{
+        IsInstalled       = $true
+        ProductReleaseIds = @($pids)
+        Languages         = @($langs)
+        Platform          = if ($props.Platform) { $props.Platform } else { "x64" }
+        Version           = if ($props.VersionToReport) { $props.VersionToReport } else { "Unknown" }
+        UpdateChannel     = if ($props.UpdateChannel) { $props.UpdateChannel } else { "Unknown" }
+    }
+}
+
 function New-WinPilotOfficeRemovalXml {
     <#
     .SYNOPSIS
@@ -106,34 +160,54 @@ function Invoke-WinPilotOfficeUninstall {
         [string]$SetupPath
     )
 
-    # Step 1: Detect installed Office products to show user exactly what will be removed
-    $subInfo = Get-WinPilotOfficeSubscriptionStatus
-    $detectedProducts = if ($subInfo.ProductReleaseIds -and $subInfo.ProductReleaseIds.Count -gt 0) {
-        $subInfo.ProductReleaseIds -join ", "
+    # Step 1: Detect installed Office products, languages, and architecture
+    $inventory = Get-WinPilotOfficeInstallationInventory
+    $detectedProducts = if ($inventory.ProductReleaseIds -and $inventory.ProductReleaseIds.Count -gt 0) {
+        $inventory.ProductReleaseIds -join ", "
     } else {
         "Click-to-Run Suite / Apps"
+    }
+    $detectedLangs = if ($inventory.Languages -and $inventory.Languages.Count -gt 0) {
+        $inventory.Languages -join ", "
+    } else {
+        "en-us"
     }
 
     Write-Host ""
     Write-Host "  ================================================================" -ForegroundColor Red
     Write-Host "  OFFICE UNINSTALLATION - IMPACT ASSESSMENT" -ForegroundColor Red
     Write-Host "  ================================================================" -ForegroundColor Red
-    Write-Host "  Installed Products Detected : $detectedProducts" -ForegroundColor White
-    Write-Host "  Installed Version           : $($subInfo.Version) ($($subInfo.Architecture))" -ForegroundColor Gray
-    Write-Host "  Update Channel              : $($subInfo.UpdateChannel)" -ForegroundColor Gray
+    Write-Host "  Target Architecture         : $($inventory.Platform)" -ForegroundColor White
+    Write-Host "  Installed Version           : $($inventory.Version)" -ForegroundColor Gray
+    Write-Host "  Update Channel              : $($inventory.UpdateChannel)" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  SCOPE OF REMOVE ALL:" -ForegroundColor Yellow
-    Write-Host "  - All Click-to-Run Office applications (Word, Excel, PowerPoint, Outlook," -ForegroundColor White
-    Write-Host "    OneNote, Access, Project, Visio), Language Packs, and Proofing Tools will be removed." -ForegroundColor White
+    Write-Host "  PRODUCTS SCHEDULED FOR REMOVAL:" -ForegroundColor Yellow
+    foreach ($pid in $inventory.ProductReleaseIds) {
+        Write-Host "  - $pid" -ForegroundColor White
+    }
+    if ($inventory.ProductReleaseIds.Count -eq 0) {
+        Write-Host "  - All installed Click-to-Run Office suites and standalone apps" -ForegroundColor White
+    }
     Write-Host ""
-    Write-Host "  SAFETY ASSURANCE:" -ForegroundColor Green
-    Write-Host "  - Personal documents, Word/Excel files, and Outlook PST/OST data will be preserved." -ForegroundColor White
-    Write-Host "  - Non-Office registry branches and unrelated directories will NOT be touched." -ForegroundColor White
+    Write-Host "  LANGUAGES & PROOFING TOOLS REMOVED:" -ForegroundColor Yellow
+    foreach ($lang in $inventory.Languages) {
+        Write-Host "  - $lang (Language pack and proofing tools)" -ForegroundColor White
+    }
+    Write-Host ""
+    Write-Host "  SCOPE OF REMOVE ALL (<Remove All=""TRUE"" />):" -ForegroundColor Yellow
+    Write-Host "  - Completely uninstalls all listed Click-to-Run Office products." -ForegroundColor White
+    Write-Host "  - Removes all installed language packs, proofing tools, and fonts." -ForegroundColor White
+    Write-Host "  - Removes Start Menu shortcuts, desktop icons, and shell registrations." -ForegroundColor White
+    Write-Host ""
+    Write-Host "  SAFETY ASSURANCE (WHAT IS PRESERVED):" -ForegroundColor Green
+    Write-Host "  - Personal documents (*.docx, *.xlsx, *.pptx) are strictly preserved." -ForegroundColor White
+    Write-Host "  - Outlook data files (*.pst, *.ost) and mail profiles are strictly preserved." -ForegroundColor White
+    Write-Host "  - Non-Office system directories and registry keys are UNTOUCHED." -ForegroundColor White
     Write-Host "  - NOTICE: Automatic uninstallation rollback is NOT guaranteed once execution starts." -ForegroundColor Yellow
     Write-Host ""
 
     # Record Pre-Operation State
-    Write-WinPilotLog -Level "AUDIT" -Component "OfficeUninstall" -Message "Pre-Uninstall State: Products=$detectedProducts, Version=$($subInfo.Version), Channel=$($subInfo.UpdateChannel)"
+    Write-WinPilotLog -Level "AUDIT" -Component "OfficeUninstall" -Message "Pre-Uninstall State: Products=$detectedProducts, Languages=$detectedLangs, Version=$($inventory.Version), Platform=$($inventory.Platform), Channel=$($inventory.UpdateChannel)"
 
     # Require explicit typed confirmation
     $isConfirmed = Confirm-WinPilotAction -ActionName "Completely Uninstall Microsoft Office ($detectedProducts)" -RiskLevel "Critical" -RequiresTypedConfirmation

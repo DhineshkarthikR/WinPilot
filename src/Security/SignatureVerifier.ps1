@@ -7,6 +7,36 @@
     and PowerShell scripts, ensuring only valid and trusted publisher assets execute.
 #>
 
+function Get-WinPilotX500Attribute {
+    <#
+    .SYNOPSIS
+        Extracts a specific attribute (e.g. CN, O, C) from an X.500 Distinguished Name string.
+    .PARAMETER DistinguishedName
+        The X.500 distinguished name string.
+    .PARAMETER AttributeName
+        The RDN attribute name to extract (e.g. "CN", "O").
+    .OUTPUTS
+        [string] Attribute value, or $null if not found.
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$DistinguishedName,
+
+        [Parameter(Mandatory = $true, Position = 1)]
+        [string]$AttributeName
+    )
+
+    if ([string]::IsNullOrEmpty($DistinguishedName)) { return $null }
+    $pattern = "(?:^|,\s*)" + [regex]::Escape($AttributeName) + "\s*=\s*([^,]+)"
+    $match = [regex]::Match($DistinguishedName, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if ($match.Success) {
+        return $match.Groups[1].Value.Trim().Trim('"')
+    }
+    return $null
+}
+
 function Get-WinPilotSignature {
     <#
     .SYNOPSIS
@@ -84,11 +114,36 @@ function Test-WinPilotAuthenticode {
             return $false
         }
 
+        # 4. Strict Identity Validation: Enforce Exact X.500 RDN Attributes
         if (-not [string]::IsNullOrEmpty($ExpectedSubject)) {
-            $subject = $sig.SignerCertificate.Subject
-            if ($subject -notlike "*$ExpectedSubject*") {
-                Write-WinPilotLog -Level "ERROR" -Component "Security" -Message "Publisher mismatch for $(Split-Path $Path -Leaf)! Expected: $ExpectedSubject, Actual: $subject"
+            $leafCn = Get-WinPilotX500Attribute -DistinguishedName $sig.SignerCertificate.Subject -AttributeName "CN"
+            $leafOrg = Get-WinPilotX500Attribute -DistinguishedName $sig.SignerCertificate.Subject -AttributeName "O"
+            $expectedClean = $ExpectedSubject.Replace("CN=", "").Replace("O=", "").Trim().Trim('"')
+
+            # Verify exact equality against leaf Common Name (CN) or Organization (O)
+            $exactMatch = ($leafCn -eq $expectedClean) -or ($leafOrg -eq $expectedClean)
+            if (-not $exactMatch) {
+                Write-WinPilotLog -Level "ERROR" -Component "Security" -Message "Strict publisher mismatch for $(Split-Path $Path -Leaf)! Expected: '$expectedClean', Actual CN: '$leafCn', Org: '$leafOrg'"
                 return $false
+            }
+
+            # Enforce that Microsoft binaries terminate in an authentic Microsoft Root Authority
+            if ($expectedClean -eq "Microsoft Corporation" -or $expectedClean -eq "Microsoft Windows") {
+                $rootCert = $chain.ChainElements[$chain.ChainElements.Count - 1].Certificate
+                $rootCn = Get-WinPilotX500Attribute -DistinguishedName $rootCert.Subject -AttributeName "CN"
+                $rootOrg = Get-WinPilotX500Attribute -DistinguishedName $rootCert.Subject -AttributeName "O"
+
+                $validRootCns = @(
+                    "Microsoft Root Certificate Authority",
+                    "Microsoft Root Certificate Authority 2010",
+                    "Microsoft Root Certificate Authority 2011",
+                    "Microsoft Root Authority"
+                )
+
+                if ($rootOrg -ne "Microsoft Corporation" -or $rootCn -notin $validRootCns) {
+                    Write-WinPilotLog -Level "ERROR" -Component "Security" -Message "Untrusted root authority for $(Split-Path $Path -Leaf)! Root CN: '$rootCn', Root Org: '$rootOrg'"
+                    return $false
+                }
             }
         }
 

@@ -134,6 +134,22 @@ Describe "WinPilot Authenticode Digital Signature Verification" {
         }
     }
 
+    It "Extracts X.500 distinguished name attributes correctly" {
+        $dn = "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+        Get-WinPilotX500Attribute -DistinguishedName $dn -AttributeName "CN" | Should Be "Microsoft Corporation"
+        Get-WinPilotX500Attribute -DistinguishedName $dn -AttributeName "O" | Should Be "Microsoft Corporation"
+        Get-WinPilotX500Attribute -DistinguishedName $dn -AttributeName "C" | Should Be "US"
+        Get-WinPilotX500Attribute -DistinguishedName $dn -AttributeName "NonExistent" | Should BeNullOrEmpty
+    }
+
+    It "Rejects partial substring publisher match to prevent impersonation" {
+        if (Test-Path $signedMsBinary) {
+            # "Notepad" or "Fake Microsoft Corporation" should not match exact CN/O
+            $isValid = Test-WinPilotAuthenticode -Path $signedMsBinary -ExpectedSubject "Fake Microsoft Corporation"
+            $isValid | Should Be $false
+        }
+    }
+
     if (Test-Path $unsignedFile) { Remove-Item $unsignedFile -Force }
 }
 

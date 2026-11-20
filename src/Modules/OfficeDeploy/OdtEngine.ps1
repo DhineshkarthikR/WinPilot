@@ -69,7 +69,7 @@ function Get-WinPilotOdt {
     try {
         Write-WinPilotLog -Level "INFO" -Component "OfficeDeploy" -Message "Downloading ODT package to $tempArchive"
 
-        # Follow redirects securely and re-validate final destination URI
+        # Follow redirects securely and strictly validate final destination URI
         $req = [System.Net.HttpWebRequest]::Create($DownloadUrl)
         $req.AllowAutoRedirect = $true
         $req.MaximumAutomaticRedirections = 5
@@ -78,8 +78,28 @@ function Get-WinPilotOdt {
         $finalUri = $res.ResponseUri.AbsoluteUri
         $res.Close()
 
-        if ($finalUri -notmatch "^https://([a-zA-Z0-9\-\.]+\.)?(microsoft\.com|officecdn\.microsoft\.com)/") {
-            throw "Security Alert: Redirect destination is not an official Microsoft domain: $finalUri"
+        $finalUriObj = $null
+        try {
+            $finalUriObj = [System.Uri]$finalUri
+        }
+        catch {
+            throw "Security Alert: Final download URL is not a valid URI: $finalUri"
+        }
+
+        # Restrict strictly to explicitly approved Microsoft hostnames
+        $approvedHosts = @("download.microsoft.com", "officecdn.microsoft.com", "go.microsoft.com")
+        $actualHost = $finalUriObj.Host.ToLowerInvariant()
+
+        if ($finalUriObj.Scheme -ne "https") {
+            throw "Security Alert: Final download URL must use secure HTTPS: $finalUri"
+        }
+
+        if ($actualHost -notin $approvedHosts) {
+            throw "Security Alert: Final redirect destination host '$actualHost' is not an explicitly approved Microsoft host ($($approvedHosts -join ', ')): $finalUri"
+        }
+
+        if (-not $finalUriObj.AbsolutePath.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Security Alert: Final download URL does not target an executable (.exe) binary: $finalUri"
         }
 
         $webClient = New-Object System.Net.WebClient
