@@ -108,11 +108,19 @@ function Invoke-WinPilotOfficeUpdate {
     }
 
     $isSuccess = ($exitCode -eq 0)
-    $msg = if ($isSuccess) { "Office update check completed successfully." } else { "Office update completed with exit code: $exitCode." }
+    $msg = if ($isSuccess) {
+        "Office update client triggered successfully. Update inspection and download will proceed in the background."
+    } else {
+        "Office update trigger completed with exit code: $exitCode."
+    }
     Write-WinPilotLog -Level $(if ($isSuccess) { "INFO" } else { "WARN" }) -Component "OfficeUpdate" -Message $msg
 
     if ($isSuccess) {
         Show-WinPilotBanner -Message $msg -Type "Success"
+        Write-Host "  [UPDATE STATUS EXPLANATION]" -ForegroundColor Cyan
+        Write-Host "  - The Click-to-Run update engine runs asynchronously in the background via the ClickToRun service." -ForegroundColor Gray
+        Write-Host "  - Launching the client succeeded; package download and installation take place out-of-process." -ForegroundColor Gray
+        Write-Host "  - If applications need to close to apply updates, Office will display a native notification prompt." -ForegroundColor Gray
     } else {
         Show-WinPilotBanner -Message $msg -Type "Warning"
     }
@@ -120,6 +128,7 @@ function Invoke-WinPilotOfficeUpdate {
     return [PSCustomObject]@{
         Success       = $isSuccess
         ExitCode      = $exitCode
+        Triggered     = $isSuccess
         StatusMessage = $msg
     }
 }

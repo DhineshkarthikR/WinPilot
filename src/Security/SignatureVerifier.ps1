@@ -67,6 +67,23 @@ function Test-WinPilotAuthenticode {
             return $false
         }
 
+        # Validate Code Signing Enhanced Key Usage (OID 1.3.6.1.5.5.7.3.3)
+        $hasCodeSigningEku = $false
+        foreach ($ext in $sig.SignerCertificate.Extensions) {
+            if ($ext -is [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]) {
+                foreach ($usage in $ext.EnhancedKeyUsages) {
+                    if ($usage.Value -eq "1.3.6.1.5.5.7.3.3") {
+                        $hasCodeSigningEku = $true
+                        break
+                    }
+                }
+            }
+        }
+        if (-not $hasCodeSigningEku) {
+            Write-WinPilotLog -Level "ERROR" -Component "Security" -Message "Certificate lacks required Code Signing EKU (1.3.6.1.5.5.7.3.3) for $(Split-Path $Path -Leaf)"
+            return $false
+        }
+
         if (-not [string]::IsNullOrEmpty($ExpectedSubject)) {
             $subject = $sig.SignerCertificate.Subject
             if ($subject -notlike "*$ExpectedSubject*") {

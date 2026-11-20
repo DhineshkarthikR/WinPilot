@@ -34,8 +34,18 @@ function Get-WinPilotC2RClient {
         if (Test-Path -Path $path -PathType Leaf) {
             $isAuthentic = Test-WinPilotAuthenticode -Path $path -ExpectedSubject "Microsoft Corporation"
             if ($isAuthentic) {
-                Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Verified OfficeC2RClient.exe found at: $path"
-                return $path
+                # Strict binary identity check: Prevent spoofing by an unrelated Microsoft-signed binary
+                $versionInfo = (Get-Item -Path $path).VersionInfo
+                $isGenuineC2R = ($versionInfo.OriginalFilename -eq "OfficeC2RClient.exe") -or 
+                                ($versionInfo.FileDescription -like "*Click-to-Run*")
+
+                if ($isGenuineC2R) {
+                    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Verified OfficeC2RClient.exe found at: $path"
+                    return $path
+                }
+                else {
+                    Write-WinPilotLog -Level "WARN" -Component "OfficeRepair" -Message "Binary at $path is signed by Microsoft but is not OfficeC2RClient. Rejected."
+                }
             }
             else {
                 Write-WinPilotLog -Level "WARN" -Component "OfficeRepair" -Message "Found OfficeC2RClient.exe failed signature check: $path"
