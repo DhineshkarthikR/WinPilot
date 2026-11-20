@@ -108,7 +108,11 @@ function Invoke-WinPilotOfficeUninstall {
 
     # Step 1: Detect installed Office products to show user exactly what will be removed
     $subInfo = Get-WinPilotOfficeSubscriptionStatus
-    $detectedProducts = $subInfo.ProductReleaseIds
+    $detectedProducts = if ($subInfo.ProductReleaseIds -and $subInfo.ProductReleaseIds.Count -gt 0) {
+        $subInfo.ProductReleaseIds -join ", "
+    } else {
+        "Click-to-Run Suite / Apps"
+    }
 
     Write-Host ""
     Write-Host "  ================================================================" -ForegroundColor Red
@@ -117,6 +121,10 @@ function Invoke-WinPilotOfficeUninstall {
     Write-Host "  Installed Products Detected : $detectedProducts" -ForegroundColor White
     Write-Host "  Installed Version           : $($subInfo.Version) ($($subInfo.Architecture))" -ForegroundColor Gray
     Write-Host "  Update Channel              : $($subInfo.UpdateChannel)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  SCOPE OF REMOVE ALL:" -ForegroundColor Yellow
+    Write-Host "  - All Click-to-Run Office applications (Word, Excel, PowerPoint, Outlook," -ForegroundColor White
+    Write-Host "    OneNote, Access, Project, Visio), Language Packs, and Proofing Tools will be removed." -ForegroundColor White
     Write-Host ""
     Write-Host "  SAFETY ASSURANCE:" -ForegroundColor Green
     Write-Host "  - Personal documents, Word/Excel files, and Outlook PST/OST data will be preserved." -ForegroundColor White
@@ -150,10 +158,14 @@ function Invoke-WinPilotOfficeUninstall {
         throw "Security Error: setup.exe failed Authenticode verification."
     }
 
-    $tempXml = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "WinPilot", "ODT", "remove_config_$([Guid]::NewGuid().ToString('N')).xml")
-    New-WinPilotOfficeRemovalXml -OutputPath $tempXml | Out-Null
-
+    $tempXml = $null
     try {
+        $tempDir = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "WinPilot", "ODT")
+        if (-not (Test-Path -Path $tempDir)) {
+            [void](New-Item -ItemType Directory -Path $tempDir -Force)
+        }
+        $tempXml = [System.IO.Path]::Combine($tempDir, "remove_config_$([Guid]::NewGuid().ToString('N')).xml")
+        New-WinPilotOfficeRemovalXml -OutputPath $tempXml | Out-Null
         Write-WinPilotLog -Level "INFO" -Component "OfficeUninstall" -Message "Executing ODT removal with configuration: $tempXml"
         Show-WinPilotBanner -Message "Executing official Office uninstallation..." -Type "Info"
 
@@ -201,7 +213,7 @@ function Invoke-WinPilotOfficeUninstall {
         }
     }
     finally {
-        if (Test-Path -Path $tempXml) {
+        if ($tempXml -and (Test-Path -Path $tempXml)) {
             Remove-Item -Path $tempXml -Force -ErrorAction SilentlyContinue
         }
     }

@@ -36,7 +36,7 @@ function Get-WinPilotC2RClient {
             if ($isAuthentic) {
                 # Strict binary identity check: Prevent spoofing by an unrelated Microsoft-signed binary
                 $versionInfo = (Get-Item -Path $path).VersionInfo
-                $isGenuineC2R = ($versionInfo.OriginalFilename -eq "OfficeC2RClient.exe") -or 
+                $isGenuineC2R = ($versionInfo.OriginalFilename -eq "OfficeC2RClient.exe") -or
                                 ($versionInfo.FileDescription -like "*Click-to-Run*")
 
                 if ($isGenuineC2R) {
