@@ -18,17 +18,17 @@ Describe "WinPilot Windows Licensing Diagnostics" {
         $lic.OemKeyEmbedded | Should Not BeNullOrEmpty
     }
 
-    It "Masks OEM product key by default for privacy" {
+    It "Strictly masks OEM product key and never returns complete 25-character key" {
         $lic = Get-WinPilotWindowsLicense
         if ($lic.OemKeyEmbedded -ne "None Detected") {
-            $lic.OemKeyEmbedded | Should Match "XXXXX"
+            $lic.OemKeyEmbedded | Should Match "^XXXXX-XXXXX-XXXXX-XXXXX-[A-Z0-9]{5}$"
         }
     }
 
-    It "Unmasks OEM key when -ShowFullKey switch is provided" {
-        $lic = Get-WinPilotWindowsLicense -ShowFullKey
-        if ($lic.OemKeyEmbedded -ne "None Detected") {
-            $lic.OemKeyEmbedded.Length | Should BeGreaterThan 10
+    It "Partial product key contains at most 5 characters" {
+        $lic = Get-WinPilotWindowsLicense
+        if ($lic.PartialProductKey -ne "None") {
+            $lic.PartialProductKey.Length | Should BeLessThan 6
         }
     }
 
@@ -89,6 +89,56 @@ Describe "WinPilot Microsoft 365 Subscription Diagnostics" {
 
     It "Show-WinPilotOfficeLicenseReport renders both reports without throwing" {
         { Show-WinPilotOfficeLicenseReport } | Should Not Throw
+    }
+
+    It "Distinguishes cached token files from verified subscription status" {
+        $sub = Get-WinPilotOfficeSubscriptionStatus
+        # Token status must not claim verified active subscription on its own
+        $sub.TokenStatus | Should Match "Verification required|No Cached Tokens"
+        $sub.VerifiedSubscriptionStatus | Should Not BeNullOrEmpty
+    }
+}
+
+Describe "WinPilot Diagnostics Negative & Failure Scenarios" {
+    It "Handles simulated inaccessible CIM or empty license collection gracefully" {
+        Mock -ModuleName WinPilot Get-CimInstance {
+            throw [System.Management.Automation.ItemNotFoundException]"Simulated CIM Access Denied"
+        }
+
+        # Must not throw unhandled exception; return graceful fallback object
+        $lic = Get-WinPilotWindowsLicense
+        $lic.LicenseStatus | Should Be -1
+        $lic.LicenseStatusText | Should Be "Unknown"
+
+        $perps = Get-WinPilotOfficePerpetualStatus
+        $perps.Count | Should Be 0
+    }
+
+    It "Classifies unrecognized perpetual licensing channels as Unspecified / Ambiguous" {
+        Mock -ModuleName WinPilot Get-CimInstance {
+            return @(
+                [PSCustomObject]@{
+                    Name = "Office Custom Test"
+                    Description = "Office 16, UNKNOWN_CHANNEL_STRING edition"
+                    LicenseStatus = 1
+                    PartialProductKey = "99999"
+                    GracePeriodRemaining = 0
+                }
+            )
+        }
+
+        $perps = Get-WinPilotOfficePerpetualStatus
+        $perps.Count | Should Be 1
+        $perps[0].LicensingChannel | Should Be "Unspecified / Ambiguous Channel"
+    }
+
+    It "Handles missing ClickToRun registry gracefully" {
+        Mock -ModuleName WinPilot Test-Path { return $false }
+
+        $sub = Get-WinPilotOfficeSubscriptionStatus
+        $sub.IsClickToRunInstalled | Should Be $false
+        $sub.InstallationState | Should Be "Not Installed"
+        $sub.Version | Should Be "Not Installed"
     }
 }
 

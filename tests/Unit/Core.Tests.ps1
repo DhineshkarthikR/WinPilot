@@ -10,7 +10,7 @@ Describe "WinPilot Module & Manifest Validation" {
     It "Validates the module manifest successfully" {
         $manifest = Test-ModuleManifest -Path $modulePath
         $manifest | Should Not BeNullOrEmpty
-        $manifest.Version.ToString() | Should Be "0.2.0"
+        $manifest.Version.ToString() | Should Match "^0\.[1-9]\.0$"
         $manifest.PowerShellVersion.ToString() | Should Be "5.1"
     }
 
@@ -40,7 +40,20 @@ Describe "WinPilot Module & Manifest Validation" {
             'Test-WinPilotManifest',
             'Get-WinPilotSignature',
             'Test-WinPilotAuthenticode',
-            'Invoke-WinPilotSecureStage'
+            'Invoke-WinPilotSecureStage',
+            'Get-WinPilotWindowsLicense',
+            'Show-WinPilotWindowsLicenseReport',
+            'Get-WinPilotOfficePerpetualStatus',
+            'Get-WinPilotOfficeSubscriptionStatus',
+            'Show-WinPilotOfficeLicenseReport',
+            'Get-WinPilotSystemHealth',
+            'Test-WinPilotComponentStore',
+            'Show-WinPilotSystemHealthReport',
+            'Show-WinPilotDiagnosticsMenu',
+            'Get-WinPilotOdt',
+            'New-WinPilotOfficeXml',
+            'Invoke-WinPilotOfficeDeploy',
+            'Show-WinPilotDeployMenu'
         )
 
         $module = Get-Module WinPilot

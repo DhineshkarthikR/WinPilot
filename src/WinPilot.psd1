@@ -8,7 +8,7 @@
     RootModule = 'WinPilot.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.0'
+    ModuleVersion = '0.3.0'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Desktop', 'Core')
@@ -62,7 +62,11 @@
         'Get-WinPilotSystemHealth',
         'Test-WinPilotComponentStore',
         'Show-WinPilotSystemHealthReport',
-        'Show-WinPilotDiagnosticsMenu'
+        'Show-WinPilotDiagnosticsMenu',
+        'Get-WinPilotOdt',
+        'New-WinPilotOfficeXml',
+        'Invoke-WinPilotOfficeDeploy',
+        'Show-WinPilotDeployMenu'
     )
 
     # Cmdlets to export from this module

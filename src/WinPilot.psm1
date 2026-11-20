@@ -10,6 +10,7 @@
 $corePath = [System.IO.Path]::Combine($PSScriptRoot, "Core")
 $securityPath = [System.IO.Path]::Combine($PSScriptRoot, "Security")
 $diagPath = [System.IO.Path]::Combine($PSScriptRoot, "Modules", "Diagnostics")
+$deployPath = [System.IO.Path]::Combine($PSScriptRoot, "Modules", "OfficeDeploy")
 
 # Dot-source Core subsystem scripts in order
 . (Join-Path $corePath "Host.ps1")
@@ -26,6 +27,11 @@ $diagPath = [System.IO.Path]::Combine($PSScriptRoot, "Modules", "Diagnostics")
 . (Join-Path $diagPath "WindowsLicense.ps1")
 . (Join-Path $diagPath "OfficeLicense.ps1")
 . (Join-Path $diagPath "SystemHealth.ps1")
+
+# Dot-source Office Deployment subsystem scripts
+. (Join-Path $deployPath "OdtEngine.ps1")
+. (Join-Path $deployPath "XmlBuilder.ps1")
+. (Join-Path $deployPath "DeployRunner.ps1")
 
 # Configure console and logging upon module import
 Initialize-WinPilotConsole
@@ -140,6 +146,109 @@ function Show-WinPilotDiagnosticsMenu {
     }
 }
 
+function Show-WinPilotDeployMenu {
+    <#
+    .SYNOPSIS
+        Displays the interactive Office Deployment Suite submenu.
+    #>
+    [CmdletBinding()]
+    param()
+
+    $deployRunning = $true
+    while ($deployRunning) {
+        Clear-WinPilotScreen
+        Show-WinPilotHeader -Subtitle "Office Deployment Suite (Official Microsoft ODT)"
+
+        $deployLines = @(
+            " ",
+            "  [1] Deploy Microsoft 365 Apps for Enterprise  (x64, Current Channel)",
+            "  [2] Deploy Microsoft 365 Apps for Business    (x64, Current Channel)",
+            "  [3] Deploy Office LTSC Professional Plus 2021 (Volume, x64)",
+            "  [4] Deploy Office LTSC Professional Plus 2024 (Volume, x64)",
+            "  [5] Download Office Deployment Tool Only      (Verify setup.exe)",
+            "  [6] Download Office Installation Files Only   (/download mode)",
+            " ",
+            "  [0] Return to Main Menu",
+            " "
+        )
+
+        Format-WinPilotBox -Title "OFFICE DEPLOYMENT SUITE" -Lines $deployLines -Width 76
+        Write-Host ""
+
+        $deployChoice = Read-WinPilotChoice -ValidKeys @('1', '2', '3', '4', '5', '6', '0', 'Q') -Prompt "  Select an action [0-6]: "
+
+        $odtDir = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "WinPilot", "ODT")
+        $configPath = [System.IO.Path]::Combine($odtDir, "configuration.xml")
+
+        switch ($deployChoice) {
+            '1' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Deploy M365 Apps for Enterprise"
+                New-WinPilotOfficeXml -ProductId "O365ProPlusRetail" -Architecture "64" -Channel "Current" -OutputPath $configPath | Out-Null
+                Invoke-WinPilotOfficeDeploy -Mode "Install" -ConfigurationPath $configPath | Out-Null
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '2' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Deploy M365 Apps for Business"
+                New-WinPilotOfficeXml -ProductId "O365BusinessRetail" -Architecture "64" -Channel "Current" -OutputPath $configPath | Out-Null
+                Invoke-WinPilotOfficeDeploy -Mode "Install" -ConfigurationPath $configPath | Out-Null
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '3' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Deploy Office LTSC 2021"
+                New-WinPilotOfficeXml -ProductId "ProPlus2021Volume" -Architecture "64" -Channel "PerpetualVL2021" -OutputPath $configPath | Out-Null
+                Invoke-WinPilotOfficeDeploy -Mode "Install" -ConfigurationPath $configPath | Out-Null
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '4' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Deploy Office LTSC 2024"
+                New-WinPilotOfficeXml -ProductId "ProPlus2024Volume" -Architecture "64" -Channel "PerpetualVL2024" -OutputPath $configPath | Out-Null
+                Invoke-WinPilotOfficeDeploy -Mode "Install" -ConfigurationPath $configPath | Out-Null
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '5' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Download ODT Tool"
+                Show-WinPilotBanner -Message "Acquiring and verifying official Microsoft ODT setup.exe..." -Type "Info"
+                try {
+                    $setup = Get-WinPilotOdt
+                    Show-WinPilotBanner -Message "Verified setup.exe ready at: $setup" -Type "Success"
+                }
+                catch {
+                    Show-WinPilotBanner -Message "Failed to acquire ODT: $($_.Exception.Message)" -Type "Error"
+                }
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '6' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Download Office Files (/download)"
+                New-WinPilotOfficeXml -ProductId "O365ProPlusRetail" -Architecture "64" -Channel "Current" -OutputPath $configPath | Out-Null
+                Show-WinPilotBanner -Message "Downloading Office installation streaming files to local cache..." -Type "Info"
+                Invoke-WinPilotOfficeDeploy -Mode "Download" -ConfigurationPath $configPath | Out-Null
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            { $_ -in @('0', 'Q') } {
+                $deployRunning = $false
+            }
+        }
+    }
+}
+
 function Start-WinPilot {
     <#
     .SYNOPSIS
@@ -179,12 +288,7 @@ function Start-WinPilot {
                 Show-WinPilotDiagnosticsMenu
             }
             '2' {
-                Clear-WinPilotScreen
-                Show-WinPilotHeader -Subtitle "Office Deployment Suite"
-                Show-WinPilotBanner -Message "Office Deployment subsystem reserved for Milestone 3." -Type "Info"
-                Write-Host ""
-                Write-Host "  Press any key to return to main menu..." -ForegroundColor Gray
-                [void](Read-WinPilotKey)
+                Show-WinPilotDeployMenu
             }
             '3' {
                 Clear-WinPilotScreen
@@ -256,5 +360,9 @@ Export-ModuleMember -Function @(
     "Get-WinPilotSystemHealth",
     "Test-WinPilotComponentStore",
     "Show-WinPilotSystemHealthReport",
-    "Show-WinPilotDiagnosticsMenu"
+    "Show-WinPilotDiagnosticsMenu",
+    "Get-WinPilotOdt",
+    "New-WinPilotOfficeXml",
+    "Invoke-WinPilotOfficeDeploy",
+    "Show-WinPilotDeployMenu"
 )

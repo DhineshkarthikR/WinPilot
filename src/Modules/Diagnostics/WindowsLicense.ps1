@@ -13,17 +13,12 @@ function Get-WinPilotWindowsLicense {
     <#
     .SYNOPSIS
         Retrieves detailed Windows licensing and activation status using supported CIM interfaces.
-    .PARAMETER ShowFullKey
-        If specified, displays unmasked OEM product key. By default, keys are partially masked.
     .OUTPUTS
         [PSCustomObject]
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
-    param(
-        [Parameter(Mandatory = $false)]
-        [switch]$ShowFullKey
-    )
+    param()
 
     Write-WinPilotLog -Level "INFO" -Component "Diagnostics" -Message "Initiating Windows licensing diagnostics query"
 
@@ -98,6 +93,7 @@ function Get-WinPilotWindowsLicense {
     }
 
     # Query OEM product key from UEFI ACPI table via SoftwareLicensingService
+    # Security requirement: Never display or return complete product keys.
     $oemKey = "None Detected"
     $serviceVersion = "Unknown"
     try {
@@ -106,23 +102,13 @@ function Get-WinPilotWindowsLicense {
             $serviceVersion = $sls.Version
             if (-not [string]::IsNullOrEmpty($sls.OA3xOriginalProductKey)) {
                 $rawKey = $sls.OA3xOriginalProductKey.Trim()
-                if ($ShowFullKey) {
-                    $oemKey = $rawKey
+                # Strict masking: only expose last 5 characters
+                if ($rawKey.Length -ge 5) {
+                    $last5 = $rawKey.Substring($rawKey.Length - 5)
+                    $oemKey = "XXXXX-XXXXX-XXXXX-XXXXX-$last5"
                 }
                 else {
-                    # Mask middle 15 characters: XXXXX-XXXXX-XXXXX-XXXXX-12345
-                    if ($rawKey.Length -ge 29) {
-                        $parts = $rawKey.Split('-')
-                        if ($parts.Count -eq 5) {
-                            $oemKey = "$($parts[0])-XXXXX-XXXXX-XXXXX-$($parts[4])"
-                        }
-                        else {
-                            $oemKey = "XXXXX-XXXXX-XXXXX-XXXXX-" + $rawKey.Substring($rawKey.Length - 5)
-                        }
-                    }
-                    else {
-                        $oemKey = "XXXXX-XXXXX-XXXXX-XXXXX-" + $rawKey.Substring([Math]::Max(0, $rawKey.Length - 5))
-                    }
+                    $oemKey = "Masked (OEM Key Present)"
                 }
             }
         }
@@ -152,16 +138,11 @@ function Show-WinPilotWindowsLicenseReport {
     <#
     .SYNOPSIS
         Displays a visual TUI report of the Windows licensing diagnostics.
-    .PARAMETER ShowFullKey
-        Optionally reveals unmasked OEM key.
     #>
     [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $false)]
-        [switch]$ShowFullKey
-    )
+    param()
 
-    $lic = Get-WinPilotWindowsLicense -ShowFullKey:$ShowFullKey
+    $lic = Get-WinPilotWindowsLicense
 
     $statusColor = switch ($lic.LicenseStatus) {
         1       { Get-WinPilotAnsiColor -ColorName "BrightGreen" }

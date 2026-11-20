@@ -48,7 +48,7 @@ function Get-WinPilotOfficePerpetualStatus {
                 continue
             }
 
-            $channel = "Unknown"
+            $channel = "Unspecified / Ambiguous Channel"
             if ($p.Description -match "RETAIL") { $channel = "Retail" }
             elseif ($p.Description -match "VOLUME_KMSCLIENT|VOLUME:GVLK") { $channel = "Volume: GVLK (KMS Client)" }
             elseif ($p.Description -match "VOLUME_MAK") { $channel = "Volume: MAK" }
@@ -196,17 +196,35 @@ function Get-WinPilotOfficeSubscriptionStatus {
         $null = $_
     }
 
+    # Determine verified subscription status vs cached tokens
+    $verifiedSub = "Not Verified (No Active Subscription in CIM)"
+    if ($cimSubscriptionStatus -eq "Licensed (Active)") {
+        $verifiedSub = "Verified Active (CIM)"
+    }
+    elseif ($cimSubscriptionStatus -ne "None") {
+        $verifiedSub = "Inactive / Notification (CIM)"
+    }
+
+    $tokenStatus = if ($tokenCount -gt 0) {
+        "Cached Token Present ($tokenCount token(s) on disk - Verification required)"
+    } else {
+        "No Cached Tokens Found"
+    }
+
     return [PSCustomObject]@{
-        IsClickToRunInstalled   = $isC2rInstalled
-        ProductReleaseIds       = $productReleaseIds
-        Version                 = $version
-        Architecture            = $platform
-        UpdateChannel           = $channelFriendly
-        UpdateChannelUrl        = $channelUrl
-        SharedComputerLicensing = $sharedLicensing
-        SubscriptionTokenCount  = $tokenCount
-        CimSubscriptionName     = $cimSubscriptionName
-        CimSubscriptionStatus   = $cimSubscriptionStatus
+        IsClickToRunInstalled       = $isC2rInstalled
+        InstallationState           = if ($isC2rInstalled) { "Installed" } else { "Not Installed" }
+        ProductReleaseIds           = $productReleaseIds
+        Version                     = $version
+        Architecture                = $platform
+        UpdateChannel               = $channelFriendly
+        UpdateChannelUrl            = $channelUrl
+        SharedComputerLicensing     = $sharedLicensing
+        SubscriptionTokenCount      = $tokenCount
+        TokenStatus                 = $tokenStatus
+        VerifiedSubscriptionStatus  = $verifiedSub
+        CimSubscriptionName         = $cimSubscriptionName
+        CimSubscriptionStatus       = $cimSubscriptionStatus
     }
 }
 
@@ -251,17 +269,18 @@ function Show-WinPilotOfficeLicenseReport {
     # 2. Microsoft 365 Subscription Report Box
     $subStatusColor = if ($sub.IsClickToRunInstalled) { $green } else { $gray }
     $sclBadge = if ($sub.SharedComputerLicensing) { "$green[ENABLED - Multi-user]$reset" } else { "$gray[Disabled - Standard]$reset" }
-    $tokenBadge = if ($sub.SubscriptionTokenCount -gt 0) { "$green[Present - $($sub.SubscriptionTokenCount) token(s)]$reset" } else { "$gray[None found in user profile]$reset" }
+    $verifColor = if ($sub.VerifiedSubscriptionStatus -like "*Active*") { $green } else { $yellow }
 
     $subLines = @(
         " ",
-        "  C2R Installed       : $subStatusColor$(if ($sub.IsClickToRunInstalled) { 'Yes' } else { 'No' })$reset",
+        "  C2R Installed       : $subStatusColor$($sub.InstallationState)$reset",
         "  Products Detected   : $white$($sub.ProductReleaseIds)$reset",
         "  Version & Platform  : $cyan$($sub.Version)$reset ($($sub.Architecture))",
         "  Update Channel      : $white$($sub.UpdateChannel)$reset",
         "  Shared Computer Lic : $sclBadge",
-        "  Subscription Tokens : $tokenBadge",
-        "  CIM Subscription    : $cyan$($sub.CimSubscriptionName)$reset ($($sub.CimSubscriptionStatus))",
+        "  Cached Tokens       : $gray$($sub.TokenStatus)$reset",
+        "  Subscription State  : $verifColor$($sub.VerifiedSubscriptionStatus)$reset",
+        "  CIM Subscription    : $cyan$($sub.CimSubscriptionName)$reset",
         " "
     )
 
