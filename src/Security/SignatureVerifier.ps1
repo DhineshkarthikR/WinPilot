@@ -59,6 +59,14 @@ function Test-WinPilotAuthenticode {
             return $false
         }
 
+        # Validate X.509 Certificate Chain Trust
+        $chain = New-Object System.Security.Cryptography.X509Certificates.X509Chain
+        $chainValid = $chain.Build($sig.SignerCertificate)
+        if (-not $chainValid) {
+            Write-WinPilotLog -Level "ERROR" -Component "Security" -Message "Certificate chain trust check failed for $(Split-Path $Path -Leaf)"
+            return $false
+        }
+
         if (-not [string]::IsNullOrEmpty($ExpectedSubject)) {
             $subject = $sig.SignerCertificate.Subject
             if ($subject -notlike "*$ExpectedSubject*") {

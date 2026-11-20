@@ -69,9 +69,22 @@ function Get-WinPilotOdt {
     try {
         Write-WinPilotLog -Level "INFO" -Component "OfficeDeploy" -Message "Downloading ODT package to $tempArchive"
 
+        # Follow redirects securely and re-validate final destination URI
+        $req = [System.Net.HttpWebRequest]::Create($DownloadUrl)
+        $req.AllowAutoRedirect = $true
+        $req.MaximumAutomaticRedirections = 5
+        $req.Timeout = 30000
+        $res = $req.GetResponse()
+        $finalUri = $res.ResponseUri.AbsoluteUri
+        $res.Close()
+
+        if ($finalUri -notmatch "^https://([a-zA-Z0-9\-\.]+\.)?(microsoft\.com|officecdn\.microsoft\.com)/") {
+            throw "Security Alert: Redirect destination is not an official Microsoft domain: $finalUri"
+        }
+
         $webClient = New-Object System.Net.WebClient
         try {
-            $webClient.DownloadFile($DownloadUrl, $tempArchive)
+            $webClient.DownloadFile($finalUri, $tempArchive)
         }
         finally {
             $webClient.Dispose()

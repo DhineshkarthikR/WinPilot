@@ -11,6 +11,7 @@ $corePath = [System.IO.Path]::Combine($PSScriptRoot, "Core")
 $securityPath = [System.IO.Path]::Combine($PSScriptRoot, "Security")
 $diagPath = [System.IO.Path]::Combine($PSScriptRoot, "Modules", "Diagnostics")
 $deployPath = [System.IO.Path]::Combine($PSScriptRoot, "Modules", "OfficeDeploy")
+$maintPath = [System.IO.Path]::Combine($PSScriptRoot, "Modules", "OfficeMaintenance")
 
 # Dot-source Core subsystem scripts in order
 . (Join-Path $corePath "Host.ps1")
@@ -32,6 +33,11 @@ $deployPath = [System.IO.Path]::Combine($PSScriptRoot, "Modules", "OfficeDeploy"
 . (Join-Path $deployPath "OdtEngine.ps1")
 . (Join-Path $deployPath "XmlBuilder.ps1")
 . (Join-Path $deployPath "DeployRunner.ps1")
+
+# Dot-source Office Maintenance subsystem scripts
+. (Join-Path $maintPath "OfficeRepair.ps1")
+. (Join-Path $maintPath "OfficeUpdate.ps1")
+. (Join-Path $maintPath "OfficeUninstall.ps1")
 
 # Configure console and logging upon module import
 Initialize-WinPilotConsole
@@ -249,6 +255,75 @@ function Show-WinPilotDeployMenu {
     }
 }
 
+function Show-WinPilotMaintenanceMenu {
+    <#
+    .SYNOPSIS
+        Displays the interactive Office Maintenance & Repair submenu.
+    #>
+    [CmdletBinding()]
+    param()
+
+    $maintRunning = $true
+    while ($maintRunning) {
+        Clear-WinPilotScreen
+        Show-WinPilotHeader -Subtitle "Office Maintenance & Repair Suite"
+
+        $maintLines = @(
+            " ",
+            "  [1] Office Quick Repair            (Fast local component scan & repair)",
+            "  [2] Office Online Repair           (Complete cloud stream reinstall)",
+            "  [3] Check & Apply Office Updates   (Click-to-Run background trigger)",
+            "  [4] Uninstall Microsoft Office     (Official ODT removal & cleanup)",
+            " ",
+            "  [0] Return to Main Menu",
+            " "
+        )
+
+        Format-WinPilotBox -Title "OFFICE MAINTENANCE & REPAIR" -Lines $maintLines -Width 76
+        Write-Host ""
+
+        $choice = Read-WinPilotChoice -ValidKeys @('1', '2', '3', '4', '0', 'Q') -Prompt "  Select an action [0-4]: "
+
+        switch ($choice) {
+            '1' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Office Quick Repair"
+                Invoke-WinPilotOfficeQuickRepair | Out-Null
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '2' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Office Online Repair"
+                Invoke-WinPilotOfficeOnlineRepair | Out-Null
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '3' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Office Update Trigger"
+                Invoke-WinPilotOfficeUpdate | Out-Null
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '4' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Uninstall Microsoft Office"
+                Invoke-WinPilotOfficeUninstall | Out-Null
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            { $_ -in @('0', 'Q') } {
+                $maintRunning = $false
+            }
+        }
+    }
+}
+
 function Start-WinPilot {
     <#
     .SYNOPSIS
@@ -291,12 +366,7 @@ function Start-WinPilot {
                 Show-WinPilotDeployMenu
             }
             '3' {
-                Clear-WinPilotScreen
-                Show-WinPilotHeader -Subtitle "Office Maintenance & Repair"
-                Show-WinPilotBanner -Message "Office Maintenance subsystem reserved for Milestone 4." -Type "Info"
-                Write-Host ""
-                Write-Host "  Press any key to return to main menu..." -ForegroundColor Gray
-                [void](Read-WinPilotKey)
+                Show-WinPilotMaintenanceMenu
             }
             '4' {
                 Clear-WinPilotScreen
@@ -364,5 +434,13 @@ Export-ModuleMember -Function @(
     "Get-WinPilotOdt",
     "New-WinPilotOfficeXml",
     "Invoke-WinPilotOfficeDeploy",
-    "Show-WinPilotDeployMenu"
+    "Show-WinPilotDeployMenu",
+    "Get-WinPilotC2RClient",
+    "Invoke-WinPilotOfficeQuickRepair",
+    "Invoke-WinPilotOfficeOnlineRepair",
+    "Get-WinPilotOfficeUpdateConfig",
+    "Invoke-WinPilotOfficeUpdate",
+    "New-WinPilotOfficeRemovalXml",
+    "Invoke-WinPilotOfficeUninstall",
+    "Show-WinPilotMaintenanceMenu"
 )

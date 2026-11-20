@@ -53,7 +53,15 @@ Describe "WinPilot Module & Manifest Validation" {
             'Get-WinPilotOdt',
             'New-WinPilotOfficeXml',
             'Invoke-WinPilotOfficeDeploy',
-            'Show-WinPilotDeployMenu'
+            'Show-WinPilotDeployMenu',
+            'Get-WinPilotC2RClient',
+            'Invoke-WinPilotOfficeQuickRepair',
+            'Invoke-WinPilotOfficeOnlineRepair',
+            'Get-WinPilotOfficeUpdateConfig',
+            'Invoke-WinPilotOfficeUpdate',
+            'New-WinPilotOfficeRemovalXml',
+            'Invoke-WinPilotOfficeUninstall',
+            'Show-WinPilotMaintenanceMenu'
         )
 
         $module = Get-Module WinPilot
