@@ -117,6 +117,36 @@ Describe "WinPilot ODT Acquisition & Security Validation" {
         } | Should Throw
     }
 
+    It "Rejects unapproved intermediate redirect target host" {
+        Mock -ModuleName WinPilot Invoke-WinPilotHttpHop {
+            $m = New-Object -TypeName PSObject
+            $m | Add-Member -MemberType NoteProperty -Name StatusCode -Value ([System.Net.HttpStatusCode]::Found)
+            $m | Add-Member -MemberType NoteProperty -Name Headers -Value @{ Location = "https://unapproved.attacker.com/payload.exe" }
+            $m | Add-Member -MemberType ScriptMethod -Name Close -Value { }
+            $m | Add-Member -MemberType ScriptMethod -Name Dispose -Value { }
+            return $m
+        }
+
+        {
+            Get-WinPilotOdt -DownloadUrl "https://go.microsoft.com/fwlink/?linkid=2211910"
+        } | Should Throw "Security Alert: Download host"
+    }
+
+    It "Rejects intermediate HTTPS-to-HTTP downgrade redirect" {
+        Mock -ModuleName WinPilot Invoke-WinPilotHttpHop {
+            $m = New-Object -TypeName PSObject
+            $m | Add-Member -MemberType NoteProperty -Name StatusCode -Value ([System.Net.HttpStatusCode]::Found)
+            $m | Add-Member -MemberType NoteProperty -Name Headers -Value @{ Location = "http://download.microsoft.com/payload.exe" }
+            $m | Add-Member -MemberType ScriptMethod -Name Close -Value { }
+            $m | Add-Member -MemberType ScriptMethod -Name Dispose -Value { }
+            return $m
+        }
+
+        {
+            Get-WinPilotOdt -DownloadUrl "https://go.microsoft.com/fwlink/?linkid=2211910"
+        } | Should Throw "Security Alert: Download URL downgraded"
+    }
+
     It "Rejects unverified or unsigned setup binaries" {
         $fakeSetup = [System.IO.Path]::GetTempFileName()
         [System.IO.File]::WriteAllText($fakeSetup, "Fake Binary", [System.Text.Encoding]::UTF8)

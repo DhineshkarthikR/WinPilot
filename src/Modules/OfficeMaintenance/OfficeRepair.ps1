@@ -104,11 +104,11 @@ function Get-WinPilotC2RClient {
 function Invoke-WinPilotOfficeQuickRepair {
     <#
     .SYNOPSIS
-        Guides the user through Quick Repair using the supported Windows application repair interface.
+        Guides the user through Quick Repair using the supported Windows Installed Apps interface.
     .DESCRIPTION
-        Does not invent an undocumented Quick Repair CLI command. Displays guided instructions
-        and launches the supported Windows Click-to-Run repair interface (as registered in Windows ARP).
-        Clearly distinguishes launching the interface from confirming completion.
+        Launches the supported Windows Installed Apps interface (ms-settings:installed-apps)
+        and guides the user step-by-step through selecting Modify -> Quick Repair.
+        Reports that the interface was launched, not that repair completed.
     .OUTPUTS
         [PSCustomObject]
     #>
@@ -116,10 +116,9 @@ function Invoke-WinPilotOfficeQuickRepair {
     [OutputType([PSCustomObject])]
     param()
 
-    $c2rExe = Get-WinPilotC2RClient
     $inventory = Get-WinPilotOfficeInstallationInventory
 
-    if (-not $c2rExe -and -not $inventory.IsInstalled) {
+    if (-not $inventory.IsInstalled) {
         Show-WinPilotBanner -Message "Click-to-Run Office installation not found on this system." -Type "Warning"
         return [PSCustomObject]@{
             Success       = $false
@@ -127,11 +126,11 @@ function Invoke-WinPilotOfficeQuickRepair {
             Completed     = "Failed"
             ExitCode      = -1
             Scenario      = "QuickRepair"
-            StatusMessage = "OfficeClickToRun.exe not found or failed signature verification."
+            StatusMessage = "Click-to-Run Office installation not found on this system."
         }
     }
 
-    $isConfirmed = Confirm-WinPilotAction -ActionName "Open Supported Office Quick Repair Interface" -RiskLevel "Low"
+    $isConfirmed = Confirm-WinPilotAction -ActionName "Open Windows Installed Apps Interface for Quick Repair" -RiskLevel "Low"
     if (-not $isConfirmed) {
         return [PSCustomObject]@{
             Success       = $false
@@ -143,57 +142,49 @@ function Invoke-WinPilotOfficeQuickRepair {
         }
     }
 
-    $platform = if ($inventory.Platform -match "x86|32") { "x86" } else { "x64" }
-    $culture = if ($inventory.Languages -and $inventory.Languages.Count -gt 0) { $inventory.Languages[0] } else { "en-us" }
-
     Write-Host ""
     Write-Host "  ================================================================" -ForegroundColor Cyan
-    Write-Host "  SUPPORTED WINDOWS OFFICE REPAIR INTERFACE (QUICK REPAIR)" -ForegroundColor Cyan
+    Write-Host "  SUPPORTED WINDOWS APPLICATION REPAIR INTERFACE (QUICK REPAIR)" -ForegroundColor Cyan
     Write-Host "  ================================================================" -ForegroundColor Cyan
-    Write-Host "  Windows provides the native interactive repair wizard for Quick Repair." -ForegroundColor White
+    Write-Host "  Microsoft supports Quick Repair via the Windows Installed Apps interface." -ForegroundColor White
     Write-Host ""
-    Write-Host "  GUIDED INSTRUCTIONS:" -ForegroundColor Yellow
-    Write-Host "  1. The official Microsoft Click-to-Run repair dialog will now open." -ForegroundColor White
-    Write-Host "  2. In the dialog, select 'Quick Repair' (local scan, fixes files fast)." -ForegroundColor White
-    Write-Host "  3. Click 'Repair' and follow the on-screen instructions." -ForegroundColor White
+    Write-Host "  STEP-BY-STEP INSTRUCTIONS:" -ForegroundColor Yellow
+    Write-Host "  1. Windows Settings (Installed Apps) will now open." -ForegroundColor White
+    Write-Host "  2. Locate your Office product (e.g. 'Microsoft 365' or 'Office 2021')." -ForegroundColor White
+    Write-Host "  3. Click the three dots (...) or select the app and click 'Modify'." -ForegroundColor White
+    Write-Host "  4. In the dialog that appears, choose 'Quick Repair' and click 'Repair'." -ForegroundColor White
     Write-Host ""
-    Write-Host "  [NOTICE] WinPilot launches the interface; repair execution proceeds interactively." -ForegroundColor DarkGray
+    Write-Host "  [NOTICE] WinPilot reports that the Settings interface was launched." -ForegroundColor DarkGray
+    Write-Host "  Repair execution proceeds interactively in the Windows user session." -ForegroundColor DarkGray
     Write-Host ""
 
-    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Launching supported repair interface for Quick Repair guidance"
-    Show-WinPilotBanner -Message "Launching official Office Repair interface..." -Type "Info"
+    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Launching Windows Installed Apps interface (ms-settings:installed-apps)"
+    Show-WinPilotBanner -Message "Launching Windows Installed Apps settings interface..." -Type "Info"
 
     $launched = $false
     try {
-        if ($c2rExe -and (Test-Path -Path $c2rExe)) {
-            $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-            $pinfo.FileName = $c2rExe
-            $pinfo.Arguments = "scenario=repair platform=$platform culture=$culture"
-            $pinfo.UseShellExecute = $false
-            $proc = [System.Diagnostics.Process]::Start($pinfo)
-            if ($proc) {
-                $launched = $true
-                $proc.Dispose()
-            }
-        }
-        else {
-            Start-Process "ms-settings:installed-apps"
-            $launched = $true
-        }
+        Start-Process "ms-settings:installed-apps"
+        $launched = $true
     }
     catch {
-        Write-WinPilotLog -Level "ERROR" -Component "OfficeRepair" -Message "Failed to launch repair interface: $($_.Exception.Message)"
-        return [PSCustomObject]@{
-            Success       = $false
-            Launched      = $false
-            Completed     = "Failed"
-            ExitCode      = -1
-            Scenario      = "QuickRepair"
-            StatusMessage = "Failed to launch repair interface: $($_.Exception.Message)"
+        try {
+            Start-Process "ms-settings:appsfeatures"
+            $launched = $true
+        }
+        catch {
+            Write-WinPilotLog -Level "ERROR" -Component "OfficeRepair" -Message "Failed to launch Settings interface: $($_.Exception.Message)"
+            return [PSCustomObject]@{
+                Success       = $false
+                Launched      = $false
+                Completed     = "Failed"
+                ExitCode      = -1
+                Scenario      = "QuickRepair"
+                StatusMessage = "Failed to launch Windows Settings interface: $($_.Exception.Message)"
+            }
         }
     }
 
-    $msg = "Office repair wizard launched successfully. Follow the on-screen prompts to complete Quick Repair."
+    $msg = "Windows Installed Apps interface launched successfully. Follow guided steps: Modify -> Quick Repair."
     Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message $msg
     Show-WinPilotBanner -Message $msg -Type "Success"
 
@@ -270,7 +261,7 @@ function Invoke-WinPilotOfficeOnlineRepair {
         }
     }
 
-    $arg = "scenario=Repair platform=$platform culture=$culture forceappshutdown=True"
+    $arg = "scenario=Repair platform=$platform culture=$culture RepairType=FullRepair DisplayLevel=True forceappshutdown=True"
     Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Executing Office Online Repair via OfficeClickToRun.exe with args: $arg"
     Show-WinPilotBanner -Message "Launching Office Online Repair (streaming from Microsoft CDN)..." -Type "Info"
 

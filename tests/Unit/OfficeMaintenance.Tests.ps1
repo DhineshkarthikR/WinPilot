@@ -17,7 +17,9 @@ Describe "WinPilot Office Repair Subsystem" {
     }
 
     It "Quick Repair guides user and launches supported Windows repair interface" {
-        Mock -ModuleName WinPilot Get-WinPilotC2RClient { return "$env:SystemRoot\System32\cmd.exe" }
+        Mock -ModuleName WinPilot Get-WinPilotOfficeInstallationInventory {
+            return [PSCustomObject]@{ IsInstalled = $true }
+        }
         Mock -ModuleName WinPilot Confirm-WinPilotAction { return $true }
         Mock -ModuleName WinPilot Start-Process { }
 
@@ -29,7 +31,9 @@ Describe "WinPilot Office Repair Subsystem" {
     }
 
     It "Quick Repair halts gracefully when cancelled by user" {
-        Mock -ModuleName WinPilot Get-WinPilotC2RClient { return "$env:SystemRoot\System32\notepad.exe" }
+        Mock -ModuleName WinPilot Get-WinPilotOfficeInstallationInventory {
+            return [PSCustomObject]@{ IsInstalled = $true }
+        }
         Mock -ModuleName WinPilot Confirm-WinPilotAction { return $false }
 
         $res = Invoke-WinPilotOfficeQuickRepair
@@ -39,8 +43,7 @@ Describe "WinPilot Office Repair Subsystem" {
         $res.StatusMessage | Should Match "cancelled"
     }
 
-    It "Quick Repair handles missing C2R client gracefully" {
-        Mock -ModuleName WinPilot Get-WinPilotC2RClient { return $null }
+    It "Quick Repair handles missing Office installation gracefully" {
         Mock -ModuleName WinPilot Get-WinPilotOfficeInstallationInventory {
             return [PSCustomObject]@{ IsInstalled = $false }
         }

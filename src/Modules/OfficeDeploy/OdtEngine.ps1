@@ -10,6 +10,35 @@
 
 $script:DefaultOdtUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool.exe"
 
+function Invoke-WinPilotHttpHop {
+    <#
+    .SYNOPSIS
+        Issues a single HTTP request with manual redirect handling disabled.
+    .OUTPUTS
+        [System.Net.HttpWebResponse]
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$Uri
+    )
+
+    $req = [System.Net.HttpWebRequest]::Create($Uri)
+    $req.AllowAutoRedirect = $false
+    $req.Timeout = 30000
+    $req.UserAgent = "WinPilot/0.4.0 (Windows NT; Microsoft ODT Downloader)"
+
+    try {
+        return $req.GetResponse()
+    }
+    catch [System.Net.WebException] {
+        if ($_.Response -and ($_.Response.StatusCode -in @([System.Net.HttpStatusCode]::MovedPermanently, [System.Net.HttpStatusCode]::Found, [System.Net.HttpStatusCode]::SeeOther, [System.Net.HttpStatusCode]::TemporaryRedirect))) {
+            return $_.Response
+        }
+        throw
+    }
+}
+
 function Get-WinPilotOdt {
     <#
     .SYNOPSIS
@@ -71,49 +100,79 @@ function Get-WinPilotOdt {
 
         # Enforce exact hostname allowlist
         $approvedHosts = @("download.microsoft.com", "officecdn.microsoft.com", "go.microsoft.com")
+        $maxRedirects = 5
+        $redirectCount = 0
+        $currentUrl = $DownloadUrl
+        $res = $null
 
-        # Validate initial URL
-        $initUri = $null
+        # Manual redirect validation loop: validates every hop before following
         try {
-            $initUri = [System.Uri]$DownloadUrl
-        }
-        catch {
-            throw "Security Alert: Initial download URL is not a valid URI: $DownloadUrl"
-        }
+            while ($true) {
+                $uriObj = $null
+                try {
+                    $uriObj = [System.Uri]$currentUrl
+                }
+                catch {
+                    throw "Security Alert: Download URL is not a valid URI: $currentUrl"
+                }
 
-        if ($initUri.Scheme -ne "https") {
-            throw "Security Alert: Initial download URL must use secure HTTPS: $DownloadUrl"
-        }
-        if ($initUri.Host.ToLowerInvariant() -notin $approvedHosts) {
-            throw "Security Alert: Initial download host '$($initUri.Host)' is not an approved Microsoft host ($($approvedHosts -join ', ')): $DownloadUrl"
-        }
+                if ($uriObj.Scheme -ne "https") {
+                    throw "Security Alert: Download URL downgraded to non-HTTPS scheme: $currentUrl"
+                }
 
-        # Follow redirects securely and stream directly from validated response in a single HTTP operation
-        $req = [System.Net.HttpWebRequest]::Create($DownloadUrl)
-        $req.AllowAutoRedirect = $true
-        $req.MaximumAutomaticRedirections = 5
-        $req.Timeout = 60000
-        $req.UserAgent = "WinPilot/0.4.0 (Windows NT; Microsoft ODT Downloader)"
+                $actualHost = $uriObj.Host.ToLowerInvariant()
+                if ($actualHost -notin $approvedHosts) {
+                    throw "Security Alert: Download host '$actualHost' is not an approved Microsoft host ($($approvedHosts -join ', ')): $currentUrl"
+                }
 
-        $res = $req.GetResponse()
-        try {
+                $res = Invoke-WinPilotHttpHop -Uri $currentUrl
+                if (-not $res) {
+                    throw "Security Alert: Failed to obtain HTTP response from: $currentUrl"
+                }
+
+                $statusCode = [int]$res.StatusCode
+                if ($statusCode -in @(301, 302, 303, 307, 308)) {
+                    $redirectCount++
+                    if ($redirectCount -gt $maxRedirects) {
+                        throw "Security Alert: Maximum redirect limit ($maxRedirects) exceeded: $DownloadUrl"
+                    }
+
+                    $locHeader = $res.Headers["Location"]
+                    if ($res) {
+                        if ($res -is [System.IDisposable]) {
+                            $res.Dispose()
+                        }
+                        elseif ($res.PSObject.Methods['Close']) {
+                            $res.Close()
+                        }
+                    }
+                    $res = $null
+
+                    if ([string]::IsNullOrEmpty($locHeader)) {
+                        throw "Security Alert: Redirect response received without Location header: $currentUrl"
+                    }
+
+                    # Resolve relative or absolute redirect destination
+                    $nextUri = New-Object System.Uri($uriObj, $locHeader)
+                    $currentUrl = $nextUri.AbsoluteUri
+                    Write-WinPilotLog -Level "INFO" -Component "OfficeDeploy" -Message "Validating manual redirect ($redirectCount/$maxRedirects) to: $currentUrl"
+                    continue
+                }
+                elseif ($statusCode -eq 200) {
+                    # Final approved response reached
+                    break
+                }
+                else {
+                    throw "Security Alert: Unexpected HTTP status code $statusCode from: $currentUrl"
+                }
+            }
+
             $finalUri = $res.ResponseUri
-
-            # Validate final URI
-            if ($finalUri.Scheme -ne "https") {
-                throw "Security Alert: Final download URL downgraded to non-HTTPS: $($finalUri.AbsoluteUri)"
-            }
-
-            $finalHost = $finalUri.Host.ToLowerInvariant()
-            if ($finalHost -notin $approvedHosts) {
-                throw "Security Alert: Final redirect destination host '$finalHost' is not an approved Microsoft host ($($approvedHosts -join ', ')): $($finalUri.AbsoluteUri)"
-            }
-
             if (-not $finalUri.AbsolutePath.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase)) {
                 throw "Security Alert: Final download URL does not target an executable (.exe) binary: $($finalUri.AbsoluteUri)"
             }
 
-            # Stream directly from validated HTTP response to target archive (single-request pattern)
+            # Stream directly from validated final HTTP response to target archive (single connection)
             $responseStream = $res.GetResponseStream()
             $fileStream = [System.IO.File]::Create($tempArchive)
             try {
@@ -128,7 +187,14 @@ function Get-WinPilotOdt {
             }
         }
         finally {
-            $res.Close()
+            if ($res) {
+                if ($res -is [System.IDisposable]) {
+                    $res.Dispose()
+                }
+                elseif ($res.PSObject.Methods['Close']) {
+                    $res.Close()
+                }
+            }
         }
 
         if (-not (Test-Path -Path $tempArchive -PathType Leaf)) {
