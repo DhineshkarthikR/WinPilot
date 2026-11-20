@@ -195,13 +195,18 @@ function Invoke-WinPilotOfficeUninstall {
     }
     Write-Host ""
     Write-Host "  SCOPE OF REMOVE ALL (<Remove All=""TRUE"" />):" -ForegroundColor Yellow
-    Write-Host "  - Completely uninstalls all listed Click-to-Run Office products." -ForegroundColor White
+    Write-Host "  - Completely uninstalls all Microsoft 365 Apps products and suites (Word, Excel," -ForegroundColor White
+    Write-Host "    PowerPoint, Outlook, OneNote, Access, and Publisher)." -ForegroundColor White
+    Write-Host "  - Completely uninstalls all standalone products, including Microsoft Project and Visio." -ForegroundColor White
     Write-Host "  - Removes all installed language packs, proofing tools, and fonts." -ForegroundColor White
     Write-Host "  - Removes Start Menu shortcuts, desktop icons, and shell registrations." -ForegroundColor White
     Write-Host ""
-    Write-Host "  SAFETY ASSURANCE (WHAT IS PRESERVED):" -ForegroundColor Green
-    Write-Host "  - Personal documents (*.docx, *.xlsx, *.pptx) are strictly preserved." -ForegroundColor White
-    Write-Host "  - Outlook data files (*.pst, *.ost) and mail profiles are strictly preserved." -ForegroundColor White
+    Write-Host "  DATA PRESERVATION & BACKUP ADVISORY:" -ForegroundColor Green
+    Write-Host "  - Personal documents (*.docx, *.xlsx, *.pptx) in personal folders are not targeted for deletion." -ForegroundColor White
+    Write-Host "  - Outlook data files (*.pst, *.ost) in default locations are typically left intact," -ForegroundColor White
+    Write-Host "    but absolute preservation cannot be guaranteed under all uninstallation scenarios." -ForegroundColor Yellow
+    Write-Host "  - RECOMMENDATION: Strongly recommend backing up all important .pst and .ost files" -ForegroundColor Yellow
+    Write-Host "    and exporting critical mailboxes prior to initiating uninstallation!" -ForegroundColor Yellow
     Write-Host "  - Non-Office system directories and registry keys are UNTOUCHED." -ForegroundColor White
     Write-Host "  - NOTICE: Automatic uninstallation rollback is NOT guaranteed once execution starts." -ForegroundColor Yellow
     Write-Host ""

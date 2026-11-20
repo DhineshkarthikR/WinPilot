@@ -99,13 +99,19 @@ Describe "WinPilot ODT Acquisition & Security Validation" {
         } | Should Throw
     }
 
+    It "Rejects deceptive subdomains mimicking approved Microsoft hosts" {
+        {
+            Get-WinPilotOdt -DownloadUrl "https://download.microsoft.com.evil.com/fake_odt.exe"
+        } | Should Throw
+    }
+
     It "Rejects non-approved subdomains under microsoft.com" {
         {
             Get-WinPilotOdt -DownloadUrl "https://unauthorized-subdomain.microsoft.com/payload.exe"
         } | Should Throw
     }
 
-    It "Rejects non-HTTPS download URLs" {
+    It "Rejects non-HTTPS download URLs (HTTP downgrade protection)" {
         {
             Get-WinPilotOdt -DownloadUrl "http://download.microsoft.com/officedeploymenttool.exe"
         } | Should Throw

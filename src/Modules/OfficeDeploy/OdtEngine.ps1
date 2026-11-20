@@ -69,45 +69,66 @@ function Get-WinPilotOdt {
     try {
         Write-WinPilotLog -Level "INFO" -Component "OfficeDeploy" -Message "Downloading ODT package to $tempArchive"
 
-        # Follow redirects securely and strictly validate final destination URI
+        # Enforce exact hostname allowlist
+        $approvedHosts = @("download.microsoft.com", "officecdn.microsoft.com", "go.microsoft.com")
+
+        # Validate initial URL
+        $initUri = $null
+        try {
+            $initUri = [System.Uri]$DownloadUrl
+        }
+        catch {
+            throw "Security Alert: Initial download URL is not a valid URI: $DownloadUrl"
+        }
+
+        if ($initUri.Scheme -ne "https") {
+            throw "Security Alert: Initial download URL must use secure HTTPS: $DownloadUrl"
+        }
+        if ($initUri.Host.ToLowerInvariant() -notin $approvedHosts) {
+            throw "Security Alert: Initial download host '$($initUri.Host)' is not an approved Microsoft host ($($approvedHosts -join ', ')): $DownloadUrl"
+        }
+
+        # Follow redirects securely and stream directly from validated response in a single HTTP operation
         $req = [System.Net.HttpWebRequest]::Create($DownloadUrl)
         $req.AllowAutoRedirect = $true
         $req.MaximumAutomaticRedirections = 5
-        $req.Timeout = 30000
+        $req.Timeout = 60000
+        $req.UserAgent = "WinPilot/0.4.0 (Windows NT; Microsoft ODT Downloader)"
+
         $res = $req.GetResponse()
-        $finalUri = $res.ResponseUri.AbsoluteUri
-        $res.Close()
-
-        $finalUriObj = $null
         try {
-            $finalUriObj = [System.Uri]$finalUri
-        }
-        catch {
-            throw "Security Alert: Final download URL is not a valid URI: $finalUri"
-        }
+            $finalUri = $res.ResponseUri
 
-        # Restrict strictly to explicitly approved Microsoft hostnames
-        $approvedHosts = @("download.microsoft.com", "officecdn.microsoft.com", "go.microsoft.com")
-        $actualHost = $finalUriObj.Host.ToLowerInvariant()
+            # Validate final URI
+            if ($finalUri.Scheme -ne "https") {
+                throw "Security Alert: Final download URL downgraded to non-HTTPS: $($finalUri.AbsoluteUri)"
+            }
 
-        if ($finalUriObj.Scheme -ne "https") {
-            throw "Security Alert: Final download URL must use secure HTTPS: $finalUri"
-        }
+            $finalHost = $finalUri.Host.ToLowerInvariant()
+            if ($finalHost -notin $approvedHosts) {
+                throw "Security Alert: Final redirect destination host '$finalHost' is not an approved Microsoft host ($($approvedHosts -join ', ')): $($finalUri.AbsoluteUri)"
+            }
 
-        if ($actualHost -notin $approvedHosts) {
-            throw "Security Alert: Final redirect destination host '$actualHost' is not an explicitly approved Microsoft host ($($approvedHosts -join ', ')): $finalUri"
-        }
+            if (-not $finalUri.AbsolutePath.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Security Alert: Final download URL does not target an executable (.exe) binary: $($finalUri.AbsoluteUri)"
+            }
 
-        if (-not $finalUriObj.AbsolutePath.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Security Alert: Final download URL does not target an executable (.exe) binary: $finalUri"
-        }
-
-        $webClient = New-Object System.Net.WebClient
-        try {
-            $webClient.DownloadFile($finalUri, $tempArchive)
+            # Stream directly from validated HTTP response to target archive (single-request pattern)
+            $responseStream = $res.GetResponseStream()
+            $fileStream = [System.IO.File]::Create($tempArchive)
+            try {
+                $buffer = New-Object byte[] 65536
+                while (($bytesRead = $responseStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                    $fileStream.Write($buffer, 0, $bytesRead)
+                }
+            }
+            finally {
+                $fileStream.Dispose()
+                $responseStream.Dispose()
+            }
         }
         finally {
-            $webClient.Dispose()
+            $res.Close()
         }
 
         if (-not (Test-Path -Path $tempArchive -PathType Leaf)) {

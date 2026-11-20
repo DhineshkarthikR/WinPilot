@@ -3,31 +3,26 @@
     WinPilot Microsoft Office Repair Subsystem (Quick Repair & Online Repair).
 
 .DESCRIPTION
-    Provides automated invocation of Click-to-Run repair engine scenarios:
-    - Quick Repair: Scans and repairs corrupt Office files locally without internet access.
-    - Online Repair: Reinstalls and streams complete Office packages from Microsoft CDN.
-    Enforces Authenticode verification on the Click-to-Run engine (OfficeClickToRun.exe
-    as registered by Windows Add/Remove Programs) and explicit confirmation guards.
-
-    Technical Notice:
-    Command-line repair invocations (scenario=Repair, RepairType=QuickRepair/FullRepair)
-    are internal Click-to-Run engine parameters utilized by Windows Add/Remove Programs
-    (ARP) Modify integration. They are not publicly documented Microsoft Learn API
-    command-line switches. Microsoft officially recommends performing repairs via
-    Windows Settings > Installed Apps > Modify.
+    Provides automated invocation of the official Microsoft Click-to-Run repair engine:
+    - Quick Repair: Launches the supported Windows Click-to-Run repair interface and guides
+      the user step-by-step through local file verification without internet dependency.
+    - Online Repair: Invokes Microsoft's documented OfficeClickToRun.exe scenario=Repair
+      command with architecture detection, forceappshutdown warnings, and cloud reinstall.
+    Enforces Authenticode verification on OfficeClickToRun.exe (as registered in Windows ARP)
+    and explicit confirmation guards.
 #>
 
 function Get-WinPilotC2RClient {
     <#
     .SYNOPSIS
-        Locates and validates the Authenticode signature of the official Click-to-Run engine.
+        Locates and validates the Authenticode signature of the official Click-to-Run repair engine.
     .DESCRIPTION
         Discovers the native Office Click-to-Run execution engine (OfficeClickToRun.exe)
-        as registered by Windows Add/Remove Programs (ARP) for Repair, or the client launcher
-        (OfficeC2RClient.exe). Enforces strict Authenticode verification, certificate chain
-        trust, Code Signing EKU, and genuine binary identity.
+        as registered by Windows Add/Remove Programs (ARP) for Repair. Enforces strict
+        Authenticode verification, certificate chain trust, Code Signing EKU, and genuine
+        binary identity.
     .OUTPUTS
-        [string] Path to verified Click-to-Run executable.
+        [string] Path to verified OfficeClickToRun.exe.
     #>
     [CmdletBinding()]
     [OutputType([string])]
@@ -46,7 +41,6 @@ function Get-WinPilotC2RClient {
         }
         foreach ($item in $items) {
             if ($item.ModifyPath) {
-                # Extract quoted or unquoted executable path
                 $rawPath = $item.ModifyPath.Trim()
                 if ($rawPath.StartsWith('"')) {
                     $endQuote = $rawPath.IndexOf('"', 1)
@@ -69,16 +63,12 @@ function Get-WinPilotC2RClient {
     if (-not [string]::IsNullOrEmpty($clientFolder)) {
         $p1 = Join-Path $clientFolder "OfficeClickToRun.exe"
         if ($p1 -notin $candidatePaths) { $candidatePaths.Add($p1) }
-        $p2 = Join-Path $clientFolder "OfficeC2RClient.exe"
-        if ($p2 -notin $candidatePaths) { $candidatePaths.Add($p2) }
     }
 
     # 3. Standard ClickToRun shared directories
     $stdPaths = @(
         "$env:ProgramFiles\Common Files\Microsoft Shared\ClickToRun\OfficeClickToRun.exe",
-        "${env:ProgramFiles(x86)}\Common Files\Microsoft Shared\ClickToRun\OfficeClickToRun.exe",
-        "$env:ProgramFiles\Common Files\Microsoft Shared\ClickToRun\OfficeC2RClient.exe",
-        "${env:ProgramFiles(x86)}\Common Files\Microsoft Shared\ClickToRun\OfficeC2RClient.exe"
+        "${env:ProgramFiles(x86)}\Common Files\Microsoft Shared\ClickToRun\OfficeClickToRun.exe"
     )
     foreach ($sp in $stdPaths) {
         if ($sp -notin $candidatePaths) { $candidatePaths.Add($sp) }
@@ -88,36 +78,37 @@ function Get-WinPilotC2RClient {
         if (Test-Path -Path $path -PathType Leaf) {
             $isAuthentic = Test-WinPilotAuthenticode -Path $path -ExpectedSubject "Microsoft Corporation"
             if ($isAuthentic) {
-                # Strict binary identity check: Prevent spoofing by an unrelated Microsoft-signed binary
+                # Strict binary identity check: Ensure target is genuine OfficeClickToRun.exe
                 $versionInfo = (Get-Item -Path $path).VersionInfo
-                $isGenuineC2R = ($versionInfo.OriginalFilename -in @("OfficeClickToRun.exe", "OfficeC2RClient.exe")) -or
+                $isGenuineC2R = ($versionInfo.OriginalFilename -eq "OfficeClickToRun.exe") -or
                                 ($versionInfo.FileDescription -like "*Click-to-Run*")
 
                 if ($isGenuineC2R) {
-                    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Verified Click-to-Run engine found at: $path"
+                    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Verified OfficeClickToRun.exe found at: $path"
                     return $path
                 }
                 else {
-                    Write-WinPilotLog -Level "WARN" -Component "OfficeRepair" -Message "Binary at $path is signed by Microsoft but is not Office Click-to-Run engine. Rejected."
+                    Write-WinPilotLog -Level "WARN" -Component "OfficeRepair" -Message "Binary at $path is signed by Microsoft but is not OfficeClickToRun.exe. Rejected."
                 }
             }
             else {
-                Write-WinPilotLog -Level "WARN" -Component "OfficeRepair" -Message "Found candidate engine failed signature check: $path"
+                Write-WinPilotLog -Level "WARN" -Component "OfficeRepair" -Message "Candidate repair engine failed signature check: $path"
             }
         }
     }
 
-    Write-WinPilotLog -Level "WARN" -Component "OfficeRepair" -Message "Click-to-Run repair engine not found on system"
+    Write-WinPilotLog -Level "WARN" -Component "OfficeRepair" -Message "OfficeClickToRun.exe repair engine not found on system"
     return $null
 }
 
 function Invoke-WinPilotOfficeQuickRepair {
     <#
     .SYNOPSIS
-        Triggers a Click-to-Run Quick Repair of local Office installations.
+        Guides the user through Quick Repair using the supported Windows application repair interface.
     .DESCRIPTION
-        Executes local file and registry verification using the native Click-to-Run engine.
-        Note: Uses internal Click-to-Run engine parameters derived from Windows Add/Remove Programs.
+        Does not invent an undocumented Quick Repair CLI command. Displays guided instructions
+        and launches the supported Windows Click-to-Run repair interface (as registered in Windows ARP).
+        Clearly distinguishes launching the interface from confirming completion.
     .OUTPUTS
         [PSCustomObject]
     #>
@@ -126,88 +117,91 @@ function Invoke-WinPilotOfficeQuickRepair {
     param()
 
     $c2rExe = Get-WinPilotC2RClient
-    if (-not $c2rExe) {
+    $inventory = Get-WinPilotOfficeInstallationInventory
+
+    if (-not $c2rExe -and -not $inventory.IsInstalled) {
         Show-WinPilotBanner -Message "Click-to-Run Office installation not found on this system." -Type "Warning"
         return [PSCustomObject]@{
             Success       = $false
+            Launched      = $false
+            Completed     = "Failed"
             ExitCode      = -1
             Scenario      = "QuickRepair"
-            StatusMessage = "Click-to-Run engine not found or failed signature verification."
+            StatusMessage = "OfficeClickToRun.exe not found or failed signature verification."
         }
     }
 
-    $isConfirmed = Confirm-WinPilotAction -ActionName "Microsoft Office Quick Repair (Local Scan & Fix)" -RiskLevel "Low"
+    $isConfirmed = Confirm-WinPilotAction -ActionName "Open Supported Office Quick Repair Interface" -RiskLevel "Low"
     if (-not $isConfirmed) {
         return [PSCustomObject]@{
             Success       = $false
+            Launched      = $false
+            Completed     = "Cancelled"
             ExitCode      = -1
             Scenario      = "QuickRepair"
             StatusMessage = "Operation cancelled by user."
         }
     }
 
-    # Query installed platform and culture from Click-to-Run configuration
-    $c2rProps = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration" -ErrorAction SilentlyContinue
-    $platform = if ($c2rProps.Platform) { $c2rProps.Platform } else { if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" } }
-    $culture = if ($c2rProps.ClientCulture) { $c2rProps.ClientCulture } else { "en-us" }
+    $platform = if ($inventory.Platform -match "x86|32") { "x86" } else { "x64" }
+    $culture = if ($inventory.Languages -and $inventory.Languages.Count -gt 0) { $inventory.Languages[0] } else { "en-us" }
 
-    $isClickToRunExe = (Split-Path $c2rExe -Leaf).Equals("OfficeClickToRun.exe", [System.StringComparison]::OrdinalIgnoreCase)
-    $arg = if ($isClickToRunExe) {
-        "scenario=Repair platform=$platform culture=$culture RepairType=QuickRepair DisplayLevel=True"
-    } else {
-        "/repair DisplayLevel=True Scenario=QuickRepair"
-    }
-
-    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Initiating Office Quick Repair via $(Split-Path $c2rExe -Leaf) with args: $arg"
-    Show-WinPilotBanner -Message "Starting Office Quick Repair..." -Type "Info"
-
-    Write-Host "  [TECHNICAL NOTICE - CLICK-TO-RUN ENGINE REPAIR]" -ForegroundColor Cyan
-    Write-Host "  - Executing Click-to-Run engine repair parameters ($arg)." -ForegroundColor Gray
-    Write-Host "  - These parameters are internal engine switches used by Windows Add/Remove Programs (ARP)." -ForegroundColor Gray
-    Write-Host "  - They are not a separate public Microsoft Learn CLI specification." -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  ================================================================" -ForegroundColor Cyan
+    Write-Host "  SUPPORTED WINDOWS OFFICE REPAIR INTERFACE (QUICK REPAIR)" -ForegroundColor Cyan
+    Write-Host "  ================================================================" -ForegroundColor Cyan
+    Write-Host "  Windows provides the native interactive repair wizard for Quick Repair." -ForegroundColor White
+    Write-Host ""
+    Write-Host "  GUIDED INSTRUCTIONS:" -ForegroundColor Yellow
+    Write-Host "  1. The official Microsoft Click-to-Run repair dialog will now open." -ForegroundColor White
+    Write-Host "  2. In the dialog, select 'Quick Repair' (local scan, fixes files fast)." -ForegroundColor White
+    Write-Host "  3. Click 'Repair' and follow the on-screen instructions." -ForegroundColor White
+    Write-Host ""
+    Write-Host "  [NOTICE] WinPilot launches the interface; repair execution proceeds interactively." -ForegroundColor DarkGray
     Write-Host ""
 
-    $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-    $pinfo.FileName = $c2rExe
-    $pinfo.Arguments = $arg
-    $pinfo.UseShellExecute = $false
+    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Launching supported repair interface for Quick Repair guidance"
+    Show-WinPilotBanner -Message "Launching official Office Repair interface..." -Type "Info"
 
-    $process = $null
-    $exitCode = -1
-
+    $launched = $false
     try {
-        $process = [System.Diagnostics.Process]::Start($pinfo)
-        while (-not $process.HasExited) {
-            Start-Sleep -Milliseconds 500
+        if ($c2rExe -and (Test-Path -Path $c2rExe)) {
+            $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+            $pinfo.FileName = $c2rExe
+            $pinfo.Arguments = "scenario=repair platform=$platform culture=$culture"
+            $pinfo.UseShellExecute = $false
+            $proc = [System.Diagnostics.Process]::Start($pinfo)
+            if ($proc) {
+                $launched = $true
+                $proc.Dispose()
+            }
         }
-        $exitCode = $process.ExitCode
+        else {
+            Start-Process "ms-settings:installed-apps"
+            $launched = $true
+        }
     }
     catch {
-        Write-WinPilotLog -Level "ERROR" -Component "OfficeRepair" -Message "Quick Repair execution error: $($_.Exception.Message)"
+        Write-WinPilotLog -Level "ERROR" -Component "OfficeRepair" -Message "Failed to launch repair interface: $($_.Exception.Message)"
         return [PSCustomObject]@{
             Success       = $false
+            Launched      = $false
+            Completed     = "Failed"
             ExitCode      = -1
             Scenario      = "QuickRepair"
-            StatusMessage = "Execution exception: $($_.Exception.Message)"
+            StatusMessage = "Failed to launch repair interface: $($_.Exception.Message)"
         }
     }
-    finally {
-        if ($process) { $process.Dispose() }
-    }
 
-    $isSuccess = ($exitCode -eq 0)
-    $msg = if ($isSuccess) { "Office Quick Repair completed successfully." } else { "Quick Repair completed with exit code: $exitCode." }
-    Write-WinPilotLog -Level $(if ($isSuccess) { "INFO" } else { "WARN" }) -Component "OfficeRepair" -Message $msg
-
-    if ($isSuccess) {
-        Show-WinPilotBanner -Message $msg -Type "Success"
-    } else {
-        Show-WinPilotBanner -Message $msg -Type "Warning"
-    }
+    $msg = "Office repair wizard launched successfully. Follow the on-screen prompts to complete Quick Repair."
+    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message $msg
+    Show-WinPilotBanner -Message $msg -Type "Success"
 
     return [PSCustomObject]@{
-        Success       = $isSuccess
-        ExitCode      = $exitCode
+        Success       = $launched
+        Launched      = $launched
+        Completed     = "External"
+        ExitCode      = 0
         Scenario      = "QuickRepair"
         StatusMessage = $msg
     }
@@ -216,10 +210,11 @@ function Invoke-WinPilotOfficeQuickRepair {
 function Invoke-WinPilotOfficeOnlineRepair {
     <#
     .SYNOPSIS
-        Triggers an Office Online Repair (stream reinstall from Microsoft CDN).
+        Triggers an Office Online Repair using Microsoft's documented OfficeClickToRun.exe scenario=Repair command.
     .DESCRIPTION
-        Executes a complete cloud-streamed reinstall using the native Click-to-Run engine.
-        Note: Uses internal Click-to-Run engine parameters derived from Windows Add/Remove Programs.
+        Executes cloud-streamed reinstall using the native Click-to-Run engine with architecture detection.
+        Displays mandatory warnings that forceappshutdown=True can cause unsaved work to be lost.
+        Clearly distinguishes launching the repair operation from confirming that it completed.
     .OUTPUTS
         [PSCustomObject]
     #>
@@ -228,58 +223,56 @@ function Invoke-WinPilotOfficeOnlineRepair {
     param()
 
     $c2rExe = Get-WinPilotC2RClient
+    $inventory = Get-WinPilotOfficeInstallationInventory
+
     if (-not $c2rExe) {
-        Show-WinPilotBanner -Message "Click-to-Run Office installation not found on this system." -Type "Warning"
+        Show-WinPilotBanner -Message "OfficeClickToRun.exe repair engine not found on this system." -Type "Warning"
         return [PSCustomObject]@{
             Success       = $false
+            Launched      = $false
+            Completed     = "Failed"
             ExitCode      = -1
             Scenario      = "OnlineRepair"
-            StatusMessage = "Click-to-Run engine not found or failed signature verification."
+            StatusMessage = "OfficeClickToRun.exe not found or failed signature verification."
         }
     }
 
     # Record Pre-Operation State
-    $subInfo = Get-WinPilotOfficeSubscriptionStatus
-    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Pre-OnlineRepair state: Products=$($subInfo.ProductReleaseIds), Version=$($subInfo.Version), Channel=$($subInfo.UpdateChannel)"
+    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Pre-OnlineRepair state: Products=$($inventory.ProductReleaseIds -join ', '), Version=$($inventory.Version), Platform=$($inventory.Platform), Channel=$($inventory.UpdateChannel)"
 
+    # Architecture Detection
+    $platform = if ($inventory.Platform -match "x86|32") { "x86" } else { "x64" }
+    $culture = if ($inventory.Languages -and $inventory.Languages.Count -gt 0) { $inventory.Languages[0] } else { "en-us" }
+
+    # Mandatory Application Shutdown & Data Loss Warning
     Write-Host ""
-    Write-Host "  [IMPORTANT NOTE REGARDING ONLINE REPAIR]" -ForegroundColor Yellow
-    Write-Host "  Online Repair completely reinstalls all Office binaries from the Microsoft CDN." -ForegroundColor White
-    Write-Host "  - An active internet connection is mandatory." -ForegroundColor Gray
-    Write-Host "  - Existing user documents, personal files, and mailboxes will NOT be deleted." -ForegroundColor Gray
-    Write-Host "  - If interrupted by network loss, rerun Online Repair or run WinPilot Office Deployment." -ForegroundColor Gray
+    Write-Host "  ================================================================" -ForegroundColor Red
+    Write-Host "  CRITICAL WARNING: APPLICATION SHUTDOWN & DATA LOSS RISK" -ForegroundColor Red
+    Write-Host "  ================================================================" -ForegroundColor Red
+    Write-Host "  - Online Repair with forceappshutdown=True will forcefully close" -ForegroundColor Yellow
+    Write-Host "    all running Office programs (Word, Excel, PowerPoint, Outlook, OneNote)." -ForegroundColor Yellow
+    Write-Host "  - ANY UNSAVED WORK IN OPEN OFFICE DOCUMENTS WILL BE LOST!" -ForegroundColor Red
+    Write-Host "  - An active internet connection is mandatory for cloud reinstall." -ForegroundColor White
+    Write-Host "  - Existing user documents and mailboxes will not be deleted." -ForegroundColor White
+    Write-Host "  - Target Architecture: $platform | Target Culture: $culture" -ForegroundColor Gray
+    Write-Host "  ================================================================" -ForegroundColor Red
     Write-Host ""
 
-    $isConfirmed = Confirm-WinPilotAction -ActionName "Microsoft Office Online Repair (Cloud Stream Reinstall)" -RiskLevel "High" -RequiresTypedConfirmation
+    $isConfirmed = Confirm-WinPilotAction -ActionName "Microsoft Office Online Repair ($platform, Cloud Stream Reinstall)" -RiskLevel "High" -RequiresTypedConfirmation
     if (-not $isConfirmed) {
         return [PSCustomObject]@{
             Success       = $false
+            Launched      = $false
+            Completed     = "Cancelled"
             ExitCode      = -1
             Scenario      = "OnlineRepair"
             StatusMessage = "Operation cancelled by user."
         }
     }
 
-    # Query installed platform and culture from Click-to-Run configuration
-    $c2rProps = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration" -ErrorAction SilentlyContinue
-    $platform = if ($c2rProps.Platform) { $c2rProps.Platform } else { if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" } }
-    $culture = if ($c2rProps.ClientCulture) { $c2rProps.ClientCulture } else { "en-us" }
-
-    $isClickToRunExe = (Split-Path $c2rExe -Leaf).Equals("OfficeClickToRun.exe", [System.StringComparison]::OrdinalIgnoreCase)
-    $arg = if ($isClickToRunExe) {
-        "scenario=Repair platform=$platform culture=$culture RepairType=FullRepair DisplayLevel=True"
-    } else {
-        "/repair DisplayLevel=True Scenario=Repair"
-    }
-
-    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Initiating Office Online Repair via $(Split-Path $c2rExe -Leaf) with args: $arg"
-    Show-WinPilotBanner -Message "Starting Office Online Repair (streaming from Microsoft CDN)..." -Type "Info"
-
-    Write-Host "  [TECHNICAL NOTICE - CLICK-TO-RUN ENGINE REPAIR]" -ForegroundColor Cyan
-    Write-Host "  - Executing Click-to-Run engine repair parameters ($arg)." -ForegroundColor Gray
-    Write-Host "  - These parameters are internal engine switches used by Windows Add/Remove Programs (ARP)." -ForegroundColor Gray
-    Write-Host "  - They are not a separate public Microsoft Learn CLI specification." -ForegroundColor Gray
-    Write-Host ""
+    $arg = "scenario=Repair platform=$platform culture=$culture forceappshutdown=True"
+    Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Executing Office Online Repair via OfficeClickToRun.exe with args: $arg"
+    Show-WinPilotBanner -Message "Launching Office Online Repair (streaming from Microsoft CDN)..." -Type "Info"
 
     $pinfo = New-Object System.Diagnostics.ProcessStartInfo
     $pinfo.FileName = $c2rExe
@@ -300,6 +293,8 @@ function Invoke-WinPilotOfficeOnlineRepair {
         Write-WinPilotLog -Level "ERROR" -Component "OfficeRepair" -Message "Online Repair execution error: $($_.Exception.Message)"
         return [PSCustomObject]@{
             Success       = $false
+            Launched      = $false
+            Completed     = "Failed"
             ExitCode      = -1
             Scenario      = "OnlineRepair"
             StatusMessage = "Execution exception: $($_.Exception.Message)"
@@ -310,18 +305,25 @@ function Invoke-WinPilotOfficeOnlineRepair {
     }
 
     $isSuccess = ($exitCode -eq 0)
-    $msg = if ($isSuccess) { "Office Online Repair completed successfully." } else { "Online Repair completed with exit code: $exitCode." }
+    $msg = if ($isSuccess) {
+        "Office Online Repair initiated successfully. Click-to-Run service is streaming packages in the background."
+    } else {
+        "Office Online Repair process exited with code: $exitCode."
+    }
     Write-WinPilotLog -Level $(if ($isSuccess) { "INFO" } else { "WARN" }) -Component "OfficeRepair" -Message $msg
 
     if ($isSuccess) {
         Show-WinPilotBanner -Message $msg -Type "Success"
+        Write-Host "  [STATUS NOTICE] Process launch completed. Package streaming proceeds via Click-to-Run service." -ForegroundColor Cyan
     } else {
         Show-WinPilotBanner -Message $msg -Type "Warning"
-        Write-Host "  Recovery Guidance: If Office applications fail to open, re-run Online Repair or deploy using WinPilot Menu [2]." -ForegroundColor Yellow
+        Write-Host "  Recovery Guidance: If Office fails to launch, restart and re-run Online Repair or deploy using WinPilot Menu [2]." -ForegroundColor Yellow
     }
 
     return [PSCustomObject]@{
         Success       = $isSuccess
+        Launched      = $true
+        Completed     = if ($isSuccess) { "Initiated" } else { "Error" }
         ExitCode      = $exitCode
         Scenario      = "OnlineRepair"
         StatusMessage = $msg

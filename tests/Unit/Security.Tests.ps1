@@ -150,6 +150,44 @@ Describe "WinPilot Authenticode Digital Signature Verification" {
         }
     }
 
+    It "Rejects certificate when Code Signing EKU is missing" {
+        $nonCodeSigningCert = Get-ChildItem Cert:\LocalMachine\Root | Where-Object { 
+            $ekus = $_.EnhancedKeyUsageList.ObjectId.Value
+            -not ($ekus -contains "1.3.6.1.5.5.7.3.3")
+        } | Select-Object -First 1
+
+        if ($nonCodeSigningCert) {
+            Mock -ModuleName WinPilot Get-WinPilotSignature {
+                return [PSCustomObject]@{
+                    Status = [System.Management.Automation.SignatureStatus]::Valid
+                    SignerCertificate = $nonCodeSigningCert
+                }
+            }
+            $isValid = Test-WinPilotAuthenticode -Path $signedMsBinary -ExpectedSubject "Microsoft Corporation"
+            $isValid | Should Be $false
+        }
+    }
+
+    It "Rejects certificate when certificate chain trust validation fails" {
+        $rsa = [System.Security.Cryptography.RSA]::Create(2048)
+        $req = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest(
+            "CN=Microsoft Corporation, O=Microsoft Corporation",
+            $rsa,
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+            [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+        )
+        $untrustedCert = $req.CreateSelfSigned([DateTimeOffset]::Now.AddDays(-1), [DateTimeOffset]::Now.AddDays(1))
+
+        Mock -ModuleName WinPilot Get-WinPilotSignature {
+            return [PSCustomObject]@{
+                Status = [System.Management.Automation.SignatureStatus]::Valid
+                SignerCertificate = $untrustedCert
+            }
+        }
+        $isValid = Test-WinPilotAuthenticode -Path $signedMsBinary -ExpectedSubject "Microsoft Corporation"
+        $isValid | Should Be $false
+    }
+
     if (Test-Path $unsignedFile) { Remove-Item $unsignedFile -Force }
 }
 

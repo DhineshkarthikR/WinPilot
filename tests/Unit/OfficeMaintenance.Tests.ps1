@@ -16,21 +16,38 @@ Describe "WinPilot Office Repair Subsystem" {
         } | Should Not Throw
     }
 
+    It "Quick Repair guides user and launches supported Windows repair interface" {
+        Mock -ModuleName WinPilot Get-WinPilotC2RClient { return "$env:SystemRoot\System32\cmd.exe" }
+        Mock -ModuleName WinPilot Confirm-WinPilotAction { return $true }
+        Mock -ModuleName WinPilot Start-Process { }
+
+        $res = Invoke-WinPilotOfficeQuickRepair
+        $res.Success | Should Be $true
+        $res.Launched | Should Be $true
+        $res.Completed | Should Be "External"
+        $res.StatusMessage | Should Match "launched successfully"
+    }
+
     It "Quick Repair halts gracefully when cancelled by user" {
         Mock -ModuleName WinPilot Get-WinPilotC2RClient { return "$env:SystemRoot\System32\notepad.exe" }
         Mock -ModuleName WinPilot Confirm-WinPilotAction { return $false }
 
         $res = Invoke-WinPilotOfficeQuickRepair
         $res.Success | Should Be $false
+        $res.Launched | Should Be $false
         $res.ExitCode | Should Be -1
         $res.StatusMessage | Should Match "cancelled"
     }
 
     It "Quick Repair handles missing C2R client gracefully" {
         Mock -ModuleName WinPilot Get-WinPilotC2RClient { return $null }
+        Mock -ModuleName WinPilot Get-WinPilotOfficeInstallationInventory {
+            return [PSCustomObject]@{ IsInstalled = $false }
+        }
 
         $res = Invoke-WinPilotOfficeQuickRepair
         $res.Success | Should Be $false
+        $res.Launched | Should Be $false
         $res.StatusMessage | Should Match "not found"
     }
 
@@ -40,6 +57,7 @@ Describe "WinPilot Office Repair Subsystem" {
 
         $res = Invoke-WinPilotOfficeOnlineRepair
         $res.Success | Should Be $false
+        $res.Launched | Should Be $false
         $res.StatusMessage | Should Match "cancelled"
     }
 
@@ -57,32 +75,24 @@ Describe "WinPilot Office Repair Subsystem" {
         $matching | Should Not BeNullOrEmpty
     }
 
-    It "Quick Repair handles non-zero exit codes as failure" {
-        Mock -ModuleName WinPilot Get-WinPilotC2RClient { return "$PSHOME\powershell.exe" }
-        Mock -ModuleName WinPilot Confirm-WinPilotAction { return $true }
-
-        $res = Invoke-WinPilotOfficeQuickRepair
-        $res.Success | Should Be $false
-        ($res.ExitCode -ne 0) | Should Be $true
-        $res.StatusMessage | Should Match "completed with exit code:"
-    }
-
     It "Online Repair handles non-zero exit codes as failure" {
         Mock -ModuleName WinPilot Get-WinPilotC2RClient { return "$PSHOME\powershell.exe" }
         Mock -ModuleName WinPilot Confirm-WinPilotAction { return $true }
 
         $res = Invoke-WinPilotOfficeOnlineRepair
         $res.Success | Should Be $false
+        $res.Launched | Should Be $true
         ($res.ExitCode -ne 0) | Should Be $true
-        $res.StatusMessage | Should Match "completed with exit code:"
+        $res.StatusMessage | Should Match "exited with code:"
     }
 
-    It "Quick Repair captures execution exception gracefully" {
-        Mock -ModuleName WinPilot Get-WinPilotC2RClient { return "C:\NonExistent\FakePath\OfficeC2RClient.exe" }
+    It "Online Repair captures execution exception gracefully" {
+        Mock -ModuleName WinPilot Get-WinPilotC2RClient { return "C:\NonExistent\FakePath\OfficeClickToRun.exe" }
         Mock -ModuleName WinPilot Confirm-WinPilotAction { return $true }
 
-        $res = Invoke-WinPilotOfficeQuickRepair
+        $res = Invoke-WinPilotOfficeOnlineRepair
         $res.Success | Should Be $false
+        $res.Launched | Should Be $false
         $res.ExitCode | Should Be -1
         $res.StatusMessage | Should Match "exception:"
     }
@@ -233,6 +243,23 @@ Describe "WinPilot Office Uninstallation Execution & Safety Guardrails" {
         $res = Invoke-WinPilotOfficeUninstall -SetupPath $validMsBinary
         $res.Success | Should Be $false
         $res.StatusMessage | Should Match "Uninstallation failed:"
+
+        $finalXmlCount = if (Test-Path $odtTempDir) { (Get-ChildItem -Path $odtTempDir -Filter "remove_config_*.xml").Count } else { 0 }
+        $finalXmlCount | Should Be $initialXmlCount
+    }
+
+    It "Cleans up temporary removal XML if XML creation throws an exception" {
+        $validMsBinary = "$env:SystemRoot\System32\notepad.exe"
+        Mock -ModuleName WinPilot Confirm-WinPilotAction { return $true }
+        Mock -ModuleName WinPilot Test-WinPilotAuthenticode { return $true }
+        Mock -ModuleName WinPilot New-WinPilotOfficeRemovalXml { throw "Simulated XML generation failure" }
+
+        $odtTempDir = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "WinPilot", "ODT")
+        $initialXmlCount = if (Test-Path $odtTempDir) { (Get-ChildItem -Path $odtTempDir -Filter "remove_config_*.xml").Count } else { 0 }
+
+        $res = Invoke-WinPilotOfficeUninstall -SetupPath $validMsBinary
+        $res.Success | Should Be $false
+        $res.StatusMessage | Should Match "Uninstallation failed: Simulated XML generation failure"
 
         $finalXmlCount = if (Test-Path $odtTempDir) { (Get-ChildItem -Path $odtTempDir -Filter "remove_config_*.xml").Count } else { 0 }
         $finalXmlCount | Should Be $initialXmlCount
