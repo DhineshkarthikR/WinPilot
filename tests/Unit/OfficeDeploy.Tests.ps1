@@ -117,6 +117,18 @@ Describe "WinPilot ODT Acquisition & Security Validation" {
         } | Should Throw
     }
 
+    It "Rejects download URLs targeting non-standard ports" {
+        {
+            Get-WinPilotOdt -DownloadUrl "https://download.microsoft.com:8443/officedeploymenttool.exe"
+        } | Should Throw
+    }
+
+    It "Rejects download URLs containing userinfo credentials" {
+        {
+            Get-WinPilotOdt -DownloadUrl "https://user:pass@download.microsoft.com/officedeploymenttool.exe"
+        } | Should Throw
+    }
+
     It "Rejects unapproved intermediate redirect target host" {
         Mock -ModuleName WinPilot Invoke-WinPilotHttpHop {
             $m = New-Object -TypeName PSObject
@@ -147,6 +159,51 @@ Describe "WinPilot ODT Acquisition & Security Validation" {
         } | Should Throw "Security Alert: Download URL downgraded"
     }
 
+    It "Follows and validates HTTP 308 Permanent Redirect securely" {
+        Mock -ModuleName WinPilot Invoke-WinPilotHttpHop {
+            $m = New-Object -TypeName PSObject
+            $m | Add-Member -MemberType NoteProperty -Name StatusCode -Value 308
+            $m | Add-Member -MemberType NoteProperty -Name Headers -Value @{ Location = "https://unapproved.attacker.com/payload.exe" }
+            $m | Add-Member -MemberType ScriptMethod -Name Close -Value { }
+            $m | Add-Member -MemberType ScriptMethod -Name Dispose -Value { }
+            return $m
+        }
+
+        {
+            Get-WinPilotOdt -DownloadUrl "https://go.microsoft.com/fwlink/?linkid=2211910"
+        } | Should Throw "Security Alert: Download host"
+    }
+
+    It "Rejects intermediate redirect targeting non-standard port" {
+        Mock -ModuleName WinPilot Invoke-WinPilotHttpHop {
+            $m = New-Object -TypeName PSObject
+            $m | Add-Member -MemberType NoteProperty -Name StatusCode -Value 308
+            $m | Add-Member -MemberType NoteProperty -Name Headers -Value @{ Location = "https://download.microsoft.com:8443/payload.exe" }
+            $m | Add-Member -MemberType ScriptMethod -Name Close -Value { }
+            $m | Add-Member -MemberType ScriptMethod -Name Dispose -Value { }
+            return $m
+        }
+
+        {
+            Get-WinPilotOdt -DownloadUrl "https://go.microsoft.com/fwlink/?linkid=2211910"
+        } | Should Throw "Security Alert: Download URL uses non-standard port"
+    }
+
+    It "Rejects intermediate redirect containing userinfo credentials" {
+        Mock -ModuleName WinPilot Invoke-WinPilotHttpHop {
+            $m = New-Object -TypeName PSObject
+            $m | Add-Member -MemberType NoteProperty -Name StatusCode -Value 302
+            $m | Add-Member -MemberType NoteProperty -Name Headers -Value @{ Location = "https://user:pass@download.microsoft.com/payload.exe" }
+            $m | Add-Member -MemberType ScriptMethod -Name Close -Value { }
+            $m | Add-Member -MemberType ScriptMethod -Name Dispose -Value { }
+            return $m
+        }
+
+        {
+            Get-WinPilotOdt -DownloadUrl "https://go.microsoft.com/fwlink/?linkid=2211910"
+        } | Should Throw "Security Alert: Download URL contains unexpected userinfo"
+    }
+
     It "Rejects unverified or unsigned setup binaries" {
         $fakeSetup = [System.IO.Path]::GetTempFileName()
         [System.IO.File]::WriteAllText($fakeSetup, "Fake Binary", [System.Text.Encoding]::UTF8)
@@ -172,54 +229,58 @@ Describe "WinPilot Office Deployment Execution Runner" {
     It "Halts installation safely when user aborts confirmation prompt" {
         $tempConfig = [System.IO.Path]::GetTempFileName()
         [System.IO.File]::WriteAllText($tempConfig, "<Configuration></Configuration>", [System.Text.Encoding]::UTF8)
+        $fakeSetup = [System.IO.Path]::GetTempFileName()
+        [System.IO.File]::WriteAllText($fakeSetup, "Fake Binary", [System.Text.Encoding]::UTF8)
 
-        # Mock setup.exe path using valid signed Microsoft binary to pass pre-flight signature check
-        $validMsBinary = "$env:SystemRoot\System32\notepad.exe"
-
-        # Mock confirmation to simulate user pressing 'N'
+        Mock -ModuleName WinPilot Test-WinPilotAuthenticode { return $true }
         Mock -ModuleName WinPilot Confirm-WinPilotAction { return $false }
 
         try {
-            $result = Invoke-WinPilotOfficeDeploy -Mode "Install" -ConfigurationPath $tempConfig -SetupPath $validMsBinary
+            $result = Invoke-WinPilotOfficeDeploy -Mode "Install" -ConfigurationPath $tempConfig -SetupPath $fakeSetup
             $result.Success | Should Be $false
             $result.ExitCode | Should Be -1
             $result.StatusMessage | Should Match "Operation cancelled"
         }
         finally {
             if (Test-Path $tempConfig) { Remove-Item $tempConfig -Force }
+            if (Test-Path $fakeSetup) { Remove-Item $fakeSetup -Force }
         }
     }
 
     It "Captures execution exit code and returns success object on exit code 0" {
         $tempConfig = [System.IO.Path]::GetTempFileName()
         [System.IO.File]::WriteAllText($tempConfig, "<Configuration></Configuration>", [System.Text.Encoding]::UTF8)
-        $validMsBinary = "$env:SystemRoot\System32\notepad.exe"
+        $fakeSetup = [System.IO.Path]::GetTempFileName()
+        [System.IO.File]::WriteAllText($fakeSetup, "Fake Binary", [System.Text.Encoding]::UTF8)
 
-        # Mock confirmation to approve
+        Mock -ModuleName WinPilot Test-WinPilotAuthenticode { return $true }
         Mock -ModuleName WinPilot Confirm-WinPilotAction { return $true }
 
-        # Mock Process Start to simulate exit code 0 without actually running Office installer
-        Mock -ModuleName WinPilot Start-Sleep { }
+        $global:deployExe = $null
+        $global:deployArgs = $null
+        Mock -ModuleName WinPilot Invoke-WinPilotProcess {
+            param($FilePath, $ArgumentList, $WorkingDirectory)
+            $global:deployExe = $FilePath
+            $global:deployArgs = $ArgumentList
+            return [PSCustomObject]@{ ExitCode = 0; Success = $true }
+        }
 
         try {
-            # Test in Download mode to test argument construction
-            $mockProcess = [PSCustomObject]@{
-                HasExited = $true
-                ExitCode  = 0
-                Dispose   = { }
-            }
+            $res = Invoke-WinPilotOfficeDeploy -Mode "Download" -ConfigurationPath $tempConfig -SetupPath $fakeSetup
+            $res.Success | Should Be $true
+            $res.ExitCode | Should Be 0
+            $global:deployExe | Should Be $fakeSetup
+            $global:deployArgs | Should Match "/download"
 
-            # Verify that in Download mode, confirmation is not prompted
-            # and invalid setup signature throws
-            $invalidSetup = [System.IO.Path]::GetTempFileName()
+            # Verify that invalid setup signature throws
+            Mock -ModuleName WinPilot Test-WinPilotAuthenticode { return $false }
             {
-                Invoke-WinPilotOfficeDeploy -Mode "Download" -ConfigurationPath $tempConfig -SetupPath $invalidSetup
+                Invoke-WinPilotOfficeDeploy -Mode "Download" -ConfigurationPath $tempConfig -SetupPath $fakeSetup
             } | Should Throw
-
-            Remove-Item $invalidSetup -Force
         }
         finally {
             if (Test-Path $tempConfig) { Remove-Item $tempConfig -Force }
+            if (Test-Path $fakeSetup) { Remove-Item $fakeSetup -Force }
         }
     }
 }

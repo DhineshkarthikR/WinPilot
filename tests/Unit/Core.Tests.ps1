@@ -24,6 +24,7 @@ Describe "WinPilot Module & Manifest Validation" {
             'Get-WinPilotHost',
             'Test-WinPilotAdmin',
             'Initialize-WinPilotConsole',
+            'Invoke-WinPilotProcess',
             'Initialize-WinPilotLogger',
             'Get-WinPilotLogPath',
             'Write-WinPilotLog',
@@ -99,6 +100,16 @@ Describe "WinPilot Host & Console Detection" {
             Initialize-WinPilotConsole
             Initialize-WinPilotConsole
         } | Should Not Throw
+    }
+
+    It "Invoke-WinPilotProcess executes process and captures exit code" {
+        $res = Invoke-WinPilotProcess -FilePath "$env:SystemRoot\System32\cmd.exe" -ArgumentList "/c exit 0"
+        $res.ExitCode | Should Be 0
+        $res.Success | Should Be $true
+
+        $resFail = Invoke-WinPilotProcess -FilePath "$env:SystemRoot\System32\cmd.exe" -ArgumentList "/c exit 42"
+        $resFail.ExitCode | Should Be 42
+        $resFail.Success | Should Be $false
     }
 }
 

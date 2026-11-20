@@ -80,20 +80,12 @@ function Invoke-WinPilotOfficeUpdate {
     Show-WinPilotBanner -Message "Checking and applying Microsoft Office updates..." -Type "Info"
 
     $arg = "/update user displaylevel=true"
-    $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-    $pinfo.FileName = $c2rExe
-    $pinfo.Arguments = $arg
-    $pinfo.UseShellExecute = $false
-
-    $process = $null
+    $procResult = $null
     $exitCode = -1
 
     try {
-        $process = [System.Diagnostics.Process]::Start($pinfo)
-        while (-not $process.HasExited) {
-            Start-Sleep -Milliseconds 500
-        }
-        $exitCode = $process.ExitCode
+        $procResult = Invoke-WinPilotProcess -FilePath $c2rExe -ArgumentList $arg
+        $exitCode = $procResult.ExitCode
     }
     catch {
         Write-WinPilotLog -Level "ERROR" -Component "OfficeUpdate" -Message "Office update execution exception: $($_.Exception.Message)"
@@ -102,9 +94,6 @@ function Invoke-WinPilotOfficeUpdate {
             ExitCode      = -1
             StatusMessage = "Execution exception: $($_.Exception.Message)"
         }
-    }
-    finally {
-        if ($process) { $process.Dispose() }
     }
 
     $isSuccess = ($exitCode -eq 0)

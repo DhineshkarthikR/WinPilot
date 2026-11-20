@@ -78,10 +78,9 @@ function Get-WinPilotC2RClient {
         if (Test-Path -Path $path -PathType Leaf) {
             $isAuthentic = Test-WinPilotAuthenticode -Path $path -ExpectedSubject "Microsoft Corporation"
             if ($isAuthentic) {
-                # Strict binary identity check: Ensure target is genuine OfficeClickToRun.exe
+                # Strict binary identity check: Require OriginalFilename to equal OfficeClickToRun.exe
                 $versionInfo = (Get-Item -Path $path).VersionInfo
-                $isGenuineC2R = ($versionInfo.OriginalFilename -eq "OfficeClickToRun.exe") -or
-                                ($versionInfo.FileDescription -like "*Click-to-Run*")
+                $isGenuineC2R = ($versionInfo.OriginalFilename -ieq "OfficeClickToRun.exe")
 
                 if ($isGenuineC2R) {
                     Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Verified OfficeClickToRun.exe found at: $path"
@@ -204,6 +203,7 @@ function Invoke-WinPilotOfficeOnlineRepair {
         Triggers an Office Online Repair using Microsoft's documented OfficeClickToRun.exe scenario=Repair command.
     .DESCRIPTION
         Executes cloud-streamed reinstall using the native Click-to-Run engine with architecture detection.
+        Enforces administrator privilege verification.
         Displays mandatory warnings that forceappshutdown=True can cause unsaved work to be lost.
         Clearly distinguishes launching the repair operation from confirming that it completed.
     .OUTPUTS
@@ -212,6 +212,19 @@ function Invoke-WinPilotOfficeOnlineRepair {
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param()
+
+    if (-not (Test-WinPilotAdmin)) {
+        Show-WinPilotBanner -Message "Administrator privileges are required to execute Office Online Repair." -Type "Error"
+        Write-WinPilotLog -Level "ERROR" -Component "OfficeRepair" -Message "Online Repair aborted: session lacks elevated administrator rights."
+        return [PSCustomObject]@{
+            Success       = $false
+            Launched      = $false
+            Completed     = "Failed"
+            ExitCode      = -1
+            Scenario      = "OnlineRepair"
+            StatusMessage = "Administrator privileges required to execute Office Online Repair."
+        }
+    }
 
     $c2rExe = Get-WinPilotC2RClient
     $inventory = Get-WinPilotOfficeInstallationInventory
@@ -231,9 +244,27 @@ function Invoke-WinPilotOfficeOnlineRepair {
     # Record Pre-Operation State
     Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Pre-OnlineRepair state: Products=$($inventory.ProductReleaseIds -join ', '), Version=$($inventory.Version), Platform=$($inventory.Platform), Channel=$($inventory.UpdateChannel)"
 
-    # Architecture Detection
-    $platform = if ($inventory.Platform -match "x86|32") { "x86" } else { "x64" }
-    $culture = if ($inventory.Languages -and $inventory.Languages.Count -gt 0) { $inventory.Languages[0] } else { "en-us" }
+    # Architecture Detection (Strict: must not default unknown architecture)
+    $rawPlatform = $inventory.Platform
+    $platform = $null
+    if ($rawPlatform -match "x86|32") {
+        $platform = "x86"
+    }
+    elseif ($rawPlatform -match "x64|64") {
+        $platform = "x64"
+    }
+    else {
+        Show-WinPilotBanner -Message "Unable to detect installed Office platform architecture." -Type "Error"
+        Write-WinPilotLog -Level "ERROR" -Component "OfficeRepair" -Message "Online Repair aborted: Office platform architecture could not be determined ('$rawPlatform')."
+        return [PSCustomObject]@{
+            Success       = $false
+            Launched      = $false
+            Completed     = "Failed"
+            ExitCode      = -1
+            Scenario      = "OnlineRepair"
+            StatusMessage = "Office platform architecture could not be determined."
+        }
+    }
 
     # Mandatory Application Shutdown & Data Loss Warning
     Write-Host ""
@@ -245,7 +276,7 @@ function Invoke-WinPilotOfficeOnlineRepair {
     Write-Host "  - ANY UNSAVED WORK IN OPEN OFFICE DOCUMENTS WILL BE LOST!" -ForegroundColor Red
     Write-Host "  - An active internet connection is mandatory for cloud reinstall." -ForegroundColor White
     Write-Host "  - Existing user documents and mailboxes will not be deleted." -ForegroundColor White
-    Write-Host "  - Target Architecture: $platform | Target Culture: $culture" -ForegroundColor Gray
+    Write-Host "  - Target Architecture: $platform" -ForegroundColor Gray
     Write-Host "  ================================================================" -ForegroundColor Red
     Write-Host ""
 
@@ -261,24 +292,16 @@ function Invoke-WinPilotOfficeOnlineRepair {
         }
     }
 
-    $arg = "scenario=Repair platform=$platform culture=$culture RepairType=FullRepair DisplayLevel=True forceappshutdown=True"
+    $arg = "scenario=Repair platform=$platform RepairType=FullRepair DisplayLevel=True forceappshutdown=True"
     Write-WinPilotLog -Level "INFO" -Component "OfficeRepair" -Message "Executing Office Online Repair via OfficeClickToRun.exe with args: $arg"
     Show-WinPilotBanner -Message "Launching Office Online Repair (streaming from Microsoft CDN)..." -Type "Info"
 
-    $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-    $pinfo.FileName = $c2rExe
-    $pinfo.Arguments = $arg
-    $pinfo.UseShellExecute = $false
-
-    $process = $null
+    $procResult = $null
     $exitCode = -1
 
     try {
-        $process = [System.Diagnostics.Process]::Start($pinfo)
-        while (-not $process.HasExited) {
-            Start-Sleep -Milliseconds 500
-        }
-        $exitCode = $process.ExitCode
+        $procResult = Invoke-WinPilotProcess -FilePath $c2rExe -ArgumentList $arg
+        $exitCode = $procResult.ExitCode
     }
     catch {
         Write-WinPilotLog -Level "ERROR" -Component "OfficeRepair" -Message "Online Repair execution error: $($_.Exception.Message)"
@@ -291,14 +314,12 @@ function Invoke-WinPilotOfficeOnlineRepair {
             StatusMessage = "Execution exception: $($_.Exception.Message)"
         }
     }
-    finally {
-        if ($process) { $process.Dispose() }
-    }
 
     $isSuccess = ($exitCode -eq 0)
     $msg = if ($isSuccess) {
         "Office Online Repair initiated successfully. Click-to-Run service is streaming packages in the background."
-    } else {
+    }
+    else {
         "Office Online Repair process exited with code: $exitCode."
     }
     Write-WinPilotLog -Level $(if ($isSuccess) { "INFO" } else { "WARN" }) -Component "OfficeRepair" -Message $msg
@@ -306,7 +327,8 @@ function Invoke-WinPilotOfficeOnlineRepair {
     if ($isSuccess) {
         Show-WinPilotBanner -Message $msg -Type "Success"
         Write-Host "  [STATUS NOTICE] Process launch completed. Package streaming proceeds via Click-to-Run service." -ForegroundColor Cyan
-    } else {
+    }
+    else {
         Show-WinPilotBanner -Message $msg -Type "Warning"
         Write-Host "  Recovery Guidance: If Office fails to launch, restart and re-run Online Repair or deploy using WinPilot Menu [2]." -ForegroundColor Yellow
     }

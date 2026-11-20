@@ -32,7 +32,7 @@ function Invoke-WinPilotHttpHop {
         return $req.GetResponse()
     }
     catch [System.Net.WebException] {
-        if ($_.Response -and ($_.Response.StatusCode -in @([System.Net.HttpStatusCode]::MovedPermanently, [System.Net.HttpStatusCode]::Found, [System.Net.HttpStatusCode]::SeeOther, [System.Net.HttpStatusCode]::TemporaryRedirect))) {
+        if ($_.Response -and ([int]$_.Response.StatusCode -in @(301, 302, 303, 307, 308))) {
             return $_.Response
         }
         throw
@@ -58,11 +58,11 @@ function Get-WinPilotOdt {
 
         [Parameter(Mandatory = $false)]
         [ValidateScript({
-            if ($_ -notmatch "^https://(download\.microsoft\.com|go\.microsoft\.com)/") {
-                throw "Security Violation: ODT must be downloaded exclusively from official Microsoft domains (download.microsoft.com or go.microsoft.com)."
-            }
-            return $true
-        })]
+                if ($_ -notmatch "^https://(download\.microsoft\.com|go\.microsoft\.com)/") {
+                    throw "Security Violation: ODT must be downloaded exclusively from official Microsoft domains (download.microsoft.com or go.microsoft.com)."
+                }
+                return $true
+            })]
         [string]$DownloadUrl = $script:DefaultOdtUrl
     )
 
@@ -120,15 +120,20 @@ function Get-WinPilotOdt {
                     throw "Security Alert: Download URL downgraded to non-HTTPS scheme: $currentUrl"
                 }
 
+                if ($uriObj.Port -ne 443) {
+                    throw "Security Alert: Download URL uses non-standard port $($uriObj.Port), expected 443: $currentUrl"
+                }
+
+                if (-not [string]::IsNullOrEmpty($uriObj.UserInfo)) {
+                    throw "Security Alert: Download URL contains unexpected userinfo credentials: $currentUrl"
+                }
+
                 $actualHost = $uriObj.Host.ToLowerInvariant()
                 if ($actualHost -notin $approvedHosts) {
                     throw "Security Alert: Download host '$actualHost' is not an approved Microsoft host ($($approvedHosts -join ', ')): $currentUrl"
                 }
 
                 $res = Invoke-WinPilotHttpHop -Uri $currentUrl
-                if (-not $res) {
-                    throw "Security Alert: Failed to obtain HTTP response from: $currentUrl"
-                }
 
                 $statusCode = [int]$res.StatusCode
                 if ($statusCode -in @(301, 302, 303, 307, 308)) {

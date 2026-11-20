@@ -24,13 +24,36 @@ jobs:
         run: |
           Test-ModuleManifest -Path ./src/WinPilot.psd1
 
+      - name: Setup Compatible Pester
+        shell: ${{ matrix.shell }}
+        run: |
+          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          if (-not $pester) {
+            Write-Host "Installing Pester 4.10.1 for ${{ matrix.shell }}..."
+            Install-Module -Name Pester -RequiredVersion 4.10.1 -Force -SkipPublisherCheck -Scope CurrentUser
+          }
+
       - name: Run Pester Unit Tests
         shell: ${{ matrix.shell }}
         run: |
-          $pester = Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 1
-          Write-Host "Using Pester version: $($pester.Version)"
-          $res = Invoke-Pester -Script ./tests/Unit/Core.Tests.ps1 -PassThru
+          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          Import-Module Pester -RequiredVersion $pester.Version -Force
+          Write-Host "Using Pester version: $($pester.Version) under PowerShell $($PSVersionTable.PSVersion)"
+
+          $testFiles = Get-ChildItem -Path "./tests/Unit" -Filter "*.Tests.ps1" | Select-Object -ExpandProperty FullName
+          Write-Host "Discovered $($testFiles.Count) test files:"
+          $testFiles | ForEach-Object { Write-Host "  - $_" }
+
+          $res = Invoke-Pester -Script $testFiles -PassThru
+
+          Write-Host ""
+          Write-Host "================ TEST SUITE SUMMARY ================"
+          Write-Host "Total Tests : $($res.TotalCount)"
+          Write-Host "Passed      : $($res.PassedCount)"
+          Write-Host "Failed      : $($res.FailedCount)"
+          Write-Host "====================================================="
+
           if ($res.FailedCount -gt 0) {
-            Write-Error "Pester tests failed: $($res.FailedCount)"
+            Write-Error "Test suite failed with $($res.FailedCount) failure(s)."
             exit 1
           }

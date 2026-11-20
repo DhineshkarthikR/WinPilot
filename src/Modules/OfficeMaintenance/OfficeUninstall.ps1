@@ -248,18 +248,8 @@ function Invoke-WinPilotOfficeUninstall {
         Write-WinPilotLog -Level "INFO" -Component "OfficeUninstall" -Message "Executing ODT removal with configuration: $tempXml"
         Show-WinPilotBanner -Message "Executing official Office uninstallation..." -Type "Info"
 
-        $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-        $pinfo.FileName = $SetupPath
-        $pinfo.Arguments = "/configure `"$tempXml`""
-        $pinfo.UseShellExecute = $false
-
-        $process = [System.Diagnostics.Process]::Start($pinfo)
-        while (-not $process.HasExited) {
-            Start-Sleep -Milliseconds 500
-        }
-
-        $exitCode = $process.ExitCode
-        $process.Dispose()
+        $procResult = Invoke-WinPilotProcess -FilePath $SetupPath -ArgumentList "/configure `"$tempXml`""
+        $exitCode = $procResult.ExitCode
 
         $isSuccess = ($exitCode -eq 0)
         $msg = if ($isSuccess) {

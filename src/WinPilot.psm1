@@ -405,6 +405,7 @@ Export-ModuleMember -Function @(
     "Get-WinPilotHost",
     "Test-WinPilotAdmin",
     "Initialize-WinPilotConsole",
+    "Invoke-WinPilotProcess",
     "Initialize-WinPilotLogger",
     "Get-WinPilotLogPath",
     "Write-WinPilotLog",

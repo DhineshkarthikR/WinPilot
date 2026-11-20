@@ -76,24 +76,13 @@ function Invoke-WinPilotOfficeDeploy {
     Write-WinPilotLog -Level "INFO" -Component "DeployRunner" -Message "Starting setup.exe $setupArg"
     Show-WinPilotBanner -Message "Executing Office Deployment Tool ($Mode mode)..." -Type "Info"
 
-    $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-    $pinfo.FileName = $SetupPath
-    $pinfo.Arguments = $setupArg
-    $pinfo.UseShellExecute = $false
-    $pinfo.WorkingDirectory = Split-Path -Path $ConfigurationPath -Parent
-
-    $process = $null
+    $workDir = Split-Path -Path $ConfigurationPath -Parent
+    $procResult = $null
     $exitCode = -1
 
     try {
-        $process = [System.Diagnostics.Process]::Start($pinfo)
-
-        # Monitor execution loop
-        while (-not $process.HasExited) {
-            Start-Sleep -Milliseconds 500
-        }
-
-        $exitCode = $process.ExitCode
+        $procResult = Invoke-WinPilotProcess -FilePath $SetupPath -ArgumentList $setupArg -WorkingDirectory $workDir
+        $exitCode = $procResult.ExitCode
     }
     catch {
         Write-WinPilotLog -Level "ERROR" -Component "DeployRunner" -Message "Exception launching setup.exe: $($_.Exception.Message)"
@@ -103,9 +92,6 @@ function Invoke-WinPilotOfficeDeploy {
             Mode          = $Mode
             StatusMessage = "Execution failed with exception: $($_.Exception.Message)"
         }
-    }
-    finally {
-        if ($process) { $process.Dispose() }
     }
 
     $statusMessage = switch ($exitCode) {

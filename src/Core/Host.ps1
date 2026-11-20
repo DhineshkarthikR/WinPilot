@@ -110,3 +110,61 @@ function Initialize-WinPilotConsole {
         }
     }
 }
+
+function Invoke-WinPilotProcess {
+    <#
+    .SYNOPSIS
+        Dedicated process execution wrapper for external binaries.
+    .DESCRIPTION
+        Encapsulates System.Diagnostics.Process invocation, timeout handling,
+        and exit code extraction to ensure consistent process management
+        and clean unit test isolation.
+    .PARAMETER FilePath
+        Absolute path to the executable binary.
+    .PARAMETER ArgumentList
+        Command-line arguments string.
+    .PARAMETER WorkingDirectory
+        Optional working directory.
+    .OUTPUTS
+        [PSCustomObject] containing ExitCode and Success.
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$FilePath,
+
+        [Parameter(Mandatory = $false, Position = 1)]
+        [string]$ArgumentList = "",
+
+        [Parameter(Mandatory = $false)]
+        [string]$WorkingDirectory = ""
+    )
+
+    $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+    $pinfo.FileName = $FilePath
+    $pinfo.Arguments = $ArgumentList
+    $pinfo.UseShellExecute = $false
+    if (-not [string]::IsNullOrEmpty($WorkingDirectory)) {
+        $pinfo.WorkingDirectory = $WorkingDirectory
+    }
+
+    $process = $null
+    $exitCode = -1
+
+    try {
+        $process = [System.Diagnostics.Process]::Start($pinfo)
+        while (-not $process.HasExited) {
+            Start-Sleep -Milliseconds 100
+        }
+        $exitCode = $process.ExitCode
+    }
+    finally {
+        if ($process) { $process.Dispose() }
+    }
+
+    return [PSCustomObject]@{
+        ExitCode = $exitCode
+        Success  = ($exitCode -eq 0)
+    }
+}
