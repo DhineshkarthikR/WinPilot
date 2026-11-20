@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     WinPilot Terminal User Interface (TUI) and ANSI Rendering Engine.
 
@@ -8,22 +8,22 @@
 #>
 
 $script:Ansi = @{
-    Reset      = "$([char]27)[0m"
-    Bold       = "$([char]27)[1m"
-    Dim        = "$([char]27)[2m"
-    Cyan       = "$([char]27)[36m"
-    BrightCyan = "$([char]27)[96m"
-    Green      = "$([char]27)[32m"
-    BrightGreen= "$([char]27)[92m"
-    Yellow     = "$([char]27)[33m"
+    Reset       = "$([char]27)[0m"
+    Bold        = "$([char]27)[1m"
+    Dim         = "$([char]27)[2m"
+    Cyan        = "$([char]27)[36m"
+    BrightCyan  = "$([char]27)[96m"
+    Green       = "$([char]27)[32m"
+    BrightGreen = "$([char]27)[92m"
+    Yellow      = "$([char]27)[33m"
     BrightYellow= "$([char]27)[93m"
-    Red        = "$([char]27)[31m"
-    BrightRed  = "$([char]27)[91m"
-    White      = "$([char]27)[37m"
-    BrightWhite= "$([char]27)[97m"
-    Gray       = "$([char]27)[90m"
-    BgBlue     = "$([char]27)[44m"
-    BgGray     = "$([char]27)[100m"
+    Red         = "$([char]27)[31m"
+    BrightRed   = "$([char]27)[91m"
+    White       = "$([char]27)[37m"
+    BrightWhite = "$([char]27)[97m"
+    Gray        = "$([char]27)[90m"
+    BgBlue      = "$([char]27)[44m"
+    BgGray      = "$([char]27)[100m"
 }
 
 function Get-WinPilotAnsiColor {
@@ -80,16 +80,21 @@ function Show-WinPilotHeader {
     $psBadge = "$($script:Ansi.BrightCyan)PS $($hostInfo.PowerShellVersion.Major).$($hostInfo.PowerShellVersion.Minor)$($script:Ansi.Reset)"
     $osBadge = "$($script:Ansi.Gray)WinBuild $($hostInfo.OSBuild) ($($hostInfo.Architecture))$($script:Ansi.Reset)"
 
+    $bTop = "$([char]0x2554)$([string]::new([char]0x2550, 76))$([char]0x2557)"
+    $bMid = "$([char]0x2560)$([string]::new([char]0x2550, 76))$([char]0x2563)"
+    $bBot = "$([char]0x255A)$([string]::new([char]0x2550, 76))$([char]0x255D)"
+    $v = [char]0x2551
+
     Write-Host ""
-    Write-Host "$($script:Ansi.BrightCyan)╔════════════════════════════════════════════════════════════════════════════╗$($script:Ansi.Reset)"
-    Write-Host "$($script:Ansi.BrightCyan)║$($script:Ansi.Reset)  $($script:Ansi.Bold)$($script:Ansi.BrightWhite)WINPILOT$($script:Ansi.Reset) - Modern Windows & Office Management Architecture         $($script:Ansi.BrightCyan)║$($script:Ansi.Reset)"
+    Write-Host "$($script:Ansi.BrightCyan)$bTop$($script:Ansi.Reset)"
+    Write-Host "$($script:Ansi.BrightCyan)$v$($script:Ansi.Reset)  $($script:Ansi.Bold)$($script:Ansi.BrightWhite)WINPILOT$($script:Ansi.Reset) - Modern Windows & Office Management Architecture         $($script:Ansi.BrightCyan)$v$($script:Ansi.Reset)"
     $subPadLength = [Math]::Max(0, 74 - $Subtitle.Length)
     $subPad = " " * $subPadLength
-    Write-Host ("$($script:Ansi.BrightCyan)║$($script:Ansi.Reset)  $($script:Ansi.Gray)$Subtitle$($script:Ansi.Reset)$subPad$($script:Ansi.BrightCyan)║$($script:Ansi.Reset)")
-    Write-Host "$($script:Ansi.BrightCyan)╠════════════════════════════════════════════════════════════════════════════╣$($script:Ansi.Reset)"
+    Write-Host "$($script:Ansi.BrightCyan)$v$($script:Ansi.Reset)  $($script:Ansi.Gray)$Subtitle$($script:Ansi.Reset)$subPad$($script:Ansi.BrightCyan)$v$($script:Ansi.Reset)"
+    Write-Host "$($script:Ansi.BrightCyan)$bMid$($script:Ansi.Reset)"
     $statusLine = "  Status: $adminBadge | $psBadge | $osBadge"
     Write-Host $statusLine
-    Write-Host "$($script:Ansi.BrightCyan)╚════════════════════════════════════════════════════════════════════════════╝$($script:Ansi.Reset)"
+    Write-Host "$($script:Ansi.BrightCyan)$bBot$($script:Ansi.Reset)"
     Write-Host ""
 }
 
@@ -148,18 +153,20 @@ function Format-WinPilotBox {
 
     $c = $script:Ansi.BrightCyan
     $r = $script:Ansi.Reset
+    $horiz = [char]0x2550
+    $vert = [char]0x2551
 
     # Top border with optional title
     if ([string]::IsNullOrEmpty($Title)) {
-        Write-Host "  $c╔$([string]::new([char]0x2550, $Width - 2))╗$r"
+        Write-Host "  $c$([char]0x2554)$([string]::new($horiz, $Width - 2))$([char]0x2557)$r"
     }
     else {
         $titleText = " $Title "
         $remain = $Width - 4 - $titleText.Length
         if ($remain -lt 2) { $remain = 2 }
-        $left = [string]::new([char]0x2550, 2)
-        $right = [string]::new([char]0x2550, $remain)
-        Write-Host "  $c╔$left$($script:Ansi.Bold)$($script:Ansi.BrightWhite)$titleText$r$c$right╗$r"
+        $left = [string]::new($horiz, 2)
+        $right = [string]::new($horiz, $remain)
+        Write-Host "  $c$([char]0x2554)$left$($script:Ansi.Bold)$($script:Ansi.BrightWhite)$titleText$r$c$right$([char]0x2557)$r"
     }
 
     # Inner lines
@@ -169,9 +176,9 @@ function Format-WinPilotBox {
         $padLength = $Width - 4 - $plain.Length
         if ($padLength -lt 0) { $padLength = 0 }
         $pad = " " * $padLength
-        Write-Host "  $c║$r  $line$pad$c║$r"
+        Write-Host "  $c$vert$r  $line$pad$c$vert$r"
     }
 
     # Bottom border
-    Write-Host "  $c╚$([string]::new([char]0x2550, $Width - 2))╝$r"
+    Write-Host "  $c$([char]0x255A)$([string]::new($horiz, $Width - 2))$([char]0x255D)$r"
 }

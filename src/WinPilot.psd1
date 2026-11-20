@@ -8,7 +8,7 @@
     RootModule = 'WinPilot.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.1.0'
+    ModuleVersion = '0.2.0'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Desktop', 'Core')
@@ -53,7 +53,16 @@
         'Test-WinPilotManifest',
         'Get-WinPilotSignature',
         'Test-WinPilotAuthenticode',
-        'Invoke-WinPilotSecureStage'
+        'Invoke-WinPilotSecureStage',
+        'Get-WinPilotWindowsLicense',
+        'Show-WinPilotWindowsLicenseReport',
+        'Get-WinPilotOfficePerpetualStatus',
+        'Get-WinPilotOfficeSubscriptionStatus',
+        'Show-WinPilotOfficeLicenseReport',
+        'Get-WinPilotSystemHealth',
+        'Test-WinPilotComponentStore',
+        'Show-WinPilotSystemHealthReport',
+        'Show-WinPilotDiagnosticsMenu'
     )
 
     # Cmdlets to export from this module

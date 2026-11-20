@@ -9,6 +9,7 @@
 
 $corePath = [System.IO.Path]::Combine($PSScriptRoot, "Core")
 $securityPath = [System.IO.Path]::Combine($PSScriptRoot, "Security")
+$diagPath = [System.IO.Path]::Combine($PSScriptRoot, "Modules", "Diagnostics")
 
 # Dot-source Core subsystem scripts in order
 . (Join-Path $corePath "Host.ps1")
@@ -21,9 +22,123 @@ $securityPath = [System.IO.Path]::Combine($PSScriptRoot, "Security")
 . (Join-Path $securityPath "SignatureVerifier.ps1")
 . (Join-Path $securityPath "SecureBootstrapper.ps1")
 
+# Dot-source Diagnostics subsystem scripts
+. (Join-Path $diagPath "WindowsLicense.ps1")
+. (Join-Path $diagPath "OfficeLicense.ps1")
+. (Join-Path $diagPath "SystemHealth.ps1")
+
 # Configure console and logging upon module import
 Initialize-WinPilotConsole
 Initialize-WinPilotLogger
+
+function Show-WinPilotDiagnosticsMenu {
+    <#
+    .SYNOPSIS
+        Displays the interactive diagnostics and auditing submenu.
+    #>
+    [CmdletBinding()]
+    param()
+
+    $diagRunning = $true
+    while ($diagRunning) {
+        Clear-WinPilotScreen
+        Show-WinPilotHeader -Subtitle "Diagnostics & Licensing Auditing"
+
+        $diagLines = @(
+            " ",
+            "  [1] Windows Activation & Licensing Audit  (CIM / SoftwareLicensingProduct)",
+            "  [2] Perpetual Office Licensing Audit       (LTSC / Retail / Volume / MAK)",
+            "  [3] Microsoft 365 Subscription Audit       (C2R / Channels / SCL / Tokens)",
+            "  [4] System Specs & Component Store Health  (Hardware, Uptime, DISM)",
+            "  [5] Run Complete Diagnostics Suite         (Execute All 4 Audits)",
+            " ",
+            "  [0] Return to Main Menu",
+            " "
+        )
+
+        Format-WinPilotBox -Title "DIAGNOSTICS & AUDITING" -Lines $diagLines -Width 76
+        Write-Host ""
+
+        $diagChoice = Read-WinPilotChoice -ValidKeys @('1', '2', '3', '4', '5', '0', 'Q') -Prompt "  Select an audit [0-5]: "
+
+        switch ($diagChoice) {
+            '1' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Windows Licensing Audit"
+                Show-WinPilotWindowsLicenseReport
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '2' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Perpetual Office Licensing Audit"
+                $perps = Get-WinPilotOfficePerpetualStatus
+                $perpLines = New-Object System.Collections.Generic.List[string]
+                $perpLines.Add(" ")
+                if ($perps.Count -eq 0) {
+                    $perpLines.Add("  [No perpetual Office licenses (LTSC / Retail / MAK) detected in CIM]")
+                }
+                else {
+                    foreach ($p in $perps) {
+                        $perpLines.Add("  Product   : $($p.ProductName)")
+                        $perpLines.Add("  Status    : $($p.LicenseStatusText) | Channel: $($p.LicensingChannel)")
+                        $perpLines.Add("  Key (Last): $($p.PartialProductKey)")
+                        $perpLines.Add(" ")
+                    }
+                }
+                $perpLines.Add(" ")
+                Format-WinPilotBox -Title "PERPETUAL OFFICE LICENSES" -Lines $perpLines.ToArray() -Width 76
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '3' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Microsoft 365 Subscription Audit"
+                $sub = Get-WinPilotOfficeSubscriptionStatus
+                $subLines = @(
+                    " ",
+                    "  C2R Installed       : $(if ($sub.IsClickToRunInstalled) { 'Yes' } else { 'No' })",
+                    "  Products Detected   : $($sub.ProductReleaseIds)",
+                    "  Version & Platform  : $($sub.Version) ($($sub.Architecture))",
+                    "  Update Channel      : $($sub.UpdateChannel)",
+                    "  Shared Computer Lic : $(if ($sub.SharedComputerLicensing) { 'Enabled (Multi-user)' } else { 'Disabled (Standard)' })",
+                    "  Subscription Tokens : $(if ($sub.SubscriptionTokenCount -gt 0) { "Present ($($sub.SubscriptionTokenCount) tokens)" } else { 'None found' })",
+                    "  CIM Subscription    : $($sub.CimSubscriptionName) ($($sub.CimSubscriptionStatus))",
+                    " "
+                )
+                Format-WinPilotBox -Title "MICROSOFT 365 SUBSCRIPTION & C2R AUDIT" -Lines $subLines -Width 76
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '4' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "System Specifications & Store Health"
+                Show-WinPilotSystemHealthReport
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            '5' {
+                Clear-WinPilotScreen
+                Show-WinPilotHeader -Subtitle "Comprehensive Diagnostics Report"
+                Show-WinPilotWindowsLicenseReport
+                Write-Host ""
+                Show-WinPilotOfficeLicenseReport
+                Write-Host ""
+                Show-WinPilotSystemHealthReport
+                Write-Host ""
+                Write-Host "  Press any key to return..." -ForegroundColor Gray
+                [void](Read-WinPilotKey)
+            }
+            { $_ -in @('0', 'Q') } {
+                $diagRunning = $false
+            }
+        }
+    }
+}
 
 function Start-WinPilot {
     <#
@@ -61,12 +176,7 @@ function Start-WinPilot {
 
         switch ($choice) {
             '1' {
-                Clear-WinPilotScreen
-                Show-WinPilotHeader -Subtitle "Diagnostics & Licensing"
-                Show-WinPilotBanner -Message "Diagnostics subsystem reserved for Milestone 2." -Type "Info"
-                Write-Host ""
-                Write-Host "  Press any key to return to main menu..." -ForegroundColor Gray
-                [void](Read-WinPilotKey)
+                Show-WinPilotDiagnosticsMenu
             }
             '2' {
                 Clear-WinPilotScreen
@@ -137,5 +247,14 @@ Export-ModuleMember -Function @(
     "Test-WinPilotManifest",
     "Get-WinPilotSignature",
     "Test-WinPilotAuthenticode",
-    "Invoke-WinPilotSecureStage"
+    "Invoke-WinPilotSecureStage",
+    "Get-WinPilotWindowsLicense",
+    "Show-WinPilotWindowsLicenseReport",
+    "Get-WinPilotOfficePerpetualStatus",
+    "Get-WinPilotOfficeSubscriptionStatus",
+    "Show-WinPilotOfficeLicenseReport",
+    "Get-WinPilotSystemHealth",
+    "Test-WinPilotComponentStore",
+    "Show-WinPilotSystemHealthReport",
+    "Show-WinPilotDiagnosticsMenu"
 )

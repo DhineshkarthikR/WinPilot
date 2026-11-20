@@ -10,7 +10,7 @@ Describe "WinPilot Module & Manifest Validation" {
     It "Validates the module manifest successfully" {
         $manifest = Test-ModuleManifest -Path $modulePath
         $manifest | Should Not BeNullOrEmpty
-        $manifest.Version.ToString() | Should Be "0.1.0"
+        $manifest.Version.ToString() | Should Be "0.2.0"
         $manifest.PowerShellVersion.ToString() | Should Be "5.1"
     }
 
