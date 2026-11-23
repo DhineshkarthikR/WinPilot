@@ -7,28 +7,23 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Test on Windows (PowerShell 5.1 & PowerShell Core)
+  test-powershell-51:
+    name: Windows PowerShell 5.1
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shell: [ powershell, pwsh ]
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Validate Module Manifest
-        shell: ${{ matrix.shell }}
+        shell: powershell
         run: |
           Test-ModuleManifest -Path ./src/WinPilot.psd1
 
       - name: Run PSScriptAnalyzer
-        shell: ${{ matrix.shell }}
+        shell: powershell
         run: |
           if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
-            Write-Host "Installing PSScriptAnalyzer for ${{ matrix.shell }}..."
+            Write-Host "Installing PSScriptAnalyzer for Windows PowerShell 5.1..."
             Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
           }
           Import-Module PSScriptAnalyzer -Force
@@ -42,16 +37,79 @@ jobs:
           }
 
       - name: Setup Compatible Pester
-        shell: ${{ matrix.shell }}
+        shell: powershell
         run: |
           $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
           if (-not $pester) {
-            Write-Host "Installing Pester 4.10.1 for ${{ matrix.shell }}..."
+            Write-Host "Installing Pester 4.10.1 for Windows PowerShell 5.1..."
             Install-Module -Name Pester -RequiredVersion 4.10.1 -Force -SkipPublisherCheck -Scope CurrentUser
           }
 
       - name: Run Pester Unit Tests
-        shell: ${{ matrix.shell }}
+        shell: powershell
+        run: |
+          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          Import-Module Pester -RequiredVersion $pester.Version -Force
+          Write-Host "Using Pester version: $($pester.Version) under PowerShell $($PSVersionTable.PSVersion)"
+
+          $testFiles = Get-ChildItem -Path "./tests/Unit" -Filter "*.Tests.ps1" | Select-Object -ExpandProperty FullName
+          Write-Host "Discovered $($testFiles.Count) test files:"
+          $testFiles | ForEach-Object { Write-Host "  - $_" }
+
+          $res = Invoke-Pester -Script $testFiles -PassThru
+
+          Write-Host ""
+          Write-Host "================ TEST SUITE SUMMARY ================"
+          Write-Host "Total Tests : $($res.TotalCount)"
+          Write-Host "Passed      : $($res.PassedCount)"
+          Write-Host "Failed      : $($res.FailedCount)"
+          Write-Host "====================================================="
+
+          if ($res.FailedCount -gt 0) {
+            Write-Error "Test suite failed with $($res.FailedCount) failure(s)."
+            exit 1
+          }
+
+  test-powershell-7:
+    name: PowerShell 7
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Module Manifest
+        shell: pwsh
+        run: |
+          Test-ModuleManifest -Path ./src/WinPilot.psd1
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Write-Host "Installing PSScriptAnalyzer for PowerShell 7..."
+            Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
+          }
+          Import-Module PSScriptAnalyzer -Force
+          $violations = Invoke-ScriptAnalyzer -Path ./src -Recurse -Settings ./tests/PSScriptAnalyzerSettings.psd1
+          if ($violations) {
+            $violations | Format-Table -AutoSize
+            Write-Error "PSScriptAnalyzer detected $($violations.Count) violation(s)."
+            exit 1
+          } else {
+            Write-Host "PSScriptAnalyzer passed: 0 violations."
+          }
+
+      - name: Setup Compatible Pester
+        shell: pwsh
+        run: |
+          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          if (-not $pester) {
+            Write-Host "Installing Pester 4.10.1 for PowerShell 7..."
+            Install-Module -Name Pester -RequiredVersion 4.10.1 -Force -SkipPublisherCheck -Scope CurrentUser
+          }
+
+      - name: Run Pester Unit Tests
+        shell: pwsh
         run: |
           $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
           Import-Module Pester -RequiredVersion $pester.Version -Force
