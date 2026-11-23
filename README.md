@@ -1,19 +1,39 @@
 # WinPilot: Independent Windows & Office Management Toolkit
 
+<p align="center">
+  <img src="docs/assets/social-preview.png" alt="WinPilot Banner" width="100%" />
+</p>
+
 [![PowerShell 5.1 & 7+](https://img.shields.io/badge/PowerShell-5.1%20%7C%207%2B-blue.svg?logo=powershell)](https://github.com/winpilot/winpilot)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%20Windows%2011-0078D6.svg?logo=windows)](https://github.com/winpilot/winpilot)
 [![Pester Tests](https://img.shields.io/badge/Tests-109%2F109%20Passing-brightgreen.svg?logo=pester)](https://github.com/winpilot/winpilot)
 [![PSScriptAnalyzer](https://img.shields.io/badge/PSScriptAnalyzer-0%20Violations-brightgreen.svg)](https://github.com/winpilot/winpilot)
-[![Security Policy](https://img.shields.io/badge/Policy-Legitimate%20Administration%20Only-success.svg)](https://github.com/winpilot/winpilot)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Security Policy](https://img.shields.io/badge/Policy-Legitimate%20Administration%20Only-success.svg)](SECURITY.md)
 
 **WinPilot** is an open-source, modular Windows and Microsoft Office management and diagnostic toolkit designed for system administrators, IT professionals, and power users. Inspired by the interactive terminal ergonomics of Microsoft Activation Scripts (MAS), WinPilot is built from the ground up strictly for **legitimate systems administration**, **supported Microsoft API diagnostics**, **official Office deployment**, and **system maintenance**.
+
+---
+
+## Documentation Quick Links
+
+| Guide | Description |
+| :--- | :--- |
+| **[Quick Start Guide](docs/QUICKSTART.md)** | Step-by-step setup, first-launch instructions, and common CLI workflows |
+| **[Architecture Specification](docs/ARCHITECTURE.md)** | Technical design, subsystem blueprints, data flows, and security boundaries |
+| **[Milestone History & Roadmap](docs/MILESTONES.md)** | Completed capabilities (M1–M4) and proposed future milestones |
+| **[Changelog](CHANGELOG.md)** | Detailed release history adhering to Keep a Changelog conventions |
+| **[Contributing Guidelines](CONTRIBUTING.md)** | Development environment setup, coding standards, and PR process |
+| **[Code of Conduct](CODE_OF_CONDUCT.md)** | Community collaboration standards and professional expectations |
+| **[Security Policy](SECURITY.md)** | Vulnerability disclosure instructions, SLAs, and security commitments |
+| **[Support Guide](SUPPORT.md)** | Getting help, searching discussions, and opening structured issues |
+| **[GitHub Growth Plan](docs/GITHUB_GROWTH_PLAN.md)** | 90-day organic community strategy, technical articles, and KPIs |
 
 ---
 
 ## Table of Contents
 
 - [Core Principles & Security Invariants](#core-principles--security-invariants)
+- [Feature Comparison Matrix](#feature-comparison-matrix)
 - [Subsystems & Capabilities](#subsystems--capabilities)
   - [1. Interactive Terminal User Interface (TUI)](#1-interactive-terminal-user-interface-tui)
   - [2. Licensing & Activation Diagnostics](#2-licensing--activation-diagnostics)
@@ -33,7 +53,6 @@
 - [Testing & Quality Assurance](#testing--quality-assurance)
 - [Roadmap & Milestone Status](#roadmap--milestone-status)
 - [Privacy & Compliance Statement](#privacy--compliance-statement)
-- [License](#license)
 
 ---
 
@@ -51,6 +70,26 @@ WinPilot is engineered to adhere to strict enterprise security standards and leg
 - **PowerShell 5.1 & 7+ Dual Compatibility**: Fully functional on default Windows PowerShell 5.1 without requiring third-party runtime installations, while remaining fully compatible with PowerShell Core (pwsh 7+).
 - **Safety Confirmations Defaulting to NO**: All destructive or system-altering actions require explicit interactive confirmation, defaulting to `[NO]`. High-risk operations require typing explicit `YES`.
 - **Local Audit Trail**: All operations and user decisions are recorded with ISO 8601 timestamps and severity levels in local log files under `%ProgramData%\WinPilot\Logs`.
+
+---
+
+## Feature Comparison Matrix
+
+| Feature / Capability | WinPilot v0.4.0 | Ad-Hoc Scripts | Activation Scripts | Manual ODT Setup |
+| :--- | :---: | :---: | :---: | :---: |
+| **Interactive Terminal TUI** | **Yes** (ANSI/VT100) | Rare (CLI only) | Yes (Batch/PS) | No (GUI wizard only) |
+| **Zero Activation Bypasses / Legal** | **Yes (100% Legitimate)** | Varies | No (Bypass-focused) | Yes |
+| **Supported CIM/WMI Licensing Audits** | **Yes** (Read-only) | Partial | No (Spoofing) | No |
+| **OEM Product Key Privacy (Masked)** | **Yes** (`XXXXX-...-K73QR`)| Rare | No (Full key dumps) | N/A |
+| **M365 Token vs Subscription Separation** | **Yes** | No | No | No |
+| **Official ODT Auto-Acquisition** | **Yes** (Hardened HTTPS)| No (Manual) | No | No (Manual download) |
+| **Authenticode & Root Chain Trust Check** | **Yes** (Strict X.500) | Rare | No | Manual cert properties |
+| **Declarative Deployment XML Builder** | **Yes** (`New-WinPilotOfficeXml`)| No | No | Manual XML editing |
+| **Click-to-Run Online & Quick Repair** | **Yes** (Supported APIs) | No | No | Manual Settings app |
+| **Isolated Process Execution Wrapper** | **Yes** (`Invoke-WinPilotProcess`)| No | No | N/A |
+| **Local Session Audit Logging** | **Yes** (Structured Logs)| No | No | No |
+| **100% Automated Unit Test Suite** | **Yes** (109 Pester tests)| No | No | N/A |
+| **PowerShell 5.1 & 7+ Dual Verified** | **Yes** | Rare | No | N/A |
 
 ---
 
@@ -111,7 +150,7 @@ WinPilot is engineered to adhere to strict enterprise security standards and leg
 ### Option A: Interactive Menu (TUI)
 
 1. Open PowerShell as **Administrator** (recommended for full deployment and repair capabilities).
-2. Clone or download the repository:
+2. Clone the repository and navigate to the folder:
    ```powershell
    git clone https://github.com/winpilot/winpilot.git
    cd winpilot
@@ -151,8 +190,10 @@ WinPilot is engineered to adhere to strict enterprise security standards and leg
 WinPilot is a fully structured PowerShell module (`WinPilot.psd1`). You can import it into scripts or interactive sessions to access any of its 45 individual cmdlets directly:
 
 ```powershell
-Import-Module D:\path\to\WinPilot\src\WinPilot.psd1
+Import-Module .\src\WinPilot.psd1
 ```
+
+For more examples, see the **[Quick Start Guide](docs/QUICKSTART.md)**.
 
 ---
 
@@ -283,45 +324,34 @@ Invoke-WinPilotProcess -FilePath "C:\Deploy\setup.exe" -ArgumentList "/configure
 ```
 WinPilot/
 ├── .github/
+│   ├── ISSUE_TEMPLATE/          # Structured issue templates for bugs and features
+│   ├── PULL_REQUEST_TEMPLATE.md # Verification checklist for pull requests
 │   └── workflows/
 │       └── ci.yml               # GitHub Actions CI matrix (PowerShell 5.1 & pwsh 7+)
 ├── docs/
+│   ├── assets/                  # High-resolution social preview and visual assets
 │   ├── ARCHITECTURE.md          # Technical architecture & security specification
+│   ├── GITHUB_GROWTH_PLAN.md    # 90-day organic growth & developer outreach strategy
+│   ├── MILESTONES.md            # Detailed milestone history (M1-M4) & M5 roadmap
+│   └── QUICKSTART.md            # Fast-track setup & scriptable workflow guide
 ├── src/
 │   ├── WinPilot.psd1            # Module manifest (exported functions, metadata)
 │   ├── WinPilot.psm1            # Module loader & interactive TUI orchestrator
-│   ├── Core/
-│   │   ├── AnsiUI.ps1           # ANSI VT100 colors, banners, and box formatting
-│   │   ├── Host.ps1             # Runtime detection, elevation check, process wrapper
-│   │   ├── Input.ps1            # Single-keypress and safety confirmation engine
-│   │   └── Logger.ps1           # Structured timestamped file and console logger
+│   ├── Core/                    # Host detection, AnsiUI, Input, Logger, Process wrapper
 │   ├── Modules/
-│   │   ├── Diagnostics/
-│   │   │   ├── OfficeLicense.ps1   # Perpetual Office & M365 subscription diagnostics
-│   │   │   ├── SystemHealth.ps1    # Component Store, DISM, and reboot checks
-│   │   │   └── WindowsLicense.ps1  # Windows CIM/WMI licensing & masked key audit
-│   │   ├── OfficeDeploy/
-│   │   │   ├── DeployRunner.ps1    # ODT setup.exe execution runner
-│   │   │   ├── OdtEngine.ps1       # Hardened ODT acquisition & redirect validation
-│   │   │   └── XmlBuilder.ps1      # Declarative Office deployment XML generator
-│   │   └── OfficeMaintenance/
-│   │       ├── OfficeRepair.ps1    # Quick Repair (GUI) & Online Repair (C2R)
-│   │       ├── OfficeUninstall.ps1 # Clean ODT uninstallation & impact disclosure
-│   │       └── OfficeUpdate.ps1    # Click-to-Run update inspection & triggering
-│   └── Security/
-│       ├── Integrity.ps1           # SHA-256 hashing & manifest validation
-│       ├── SecureBootstrapper.ps1  # Staged local execution containment
-│       └── SignatureVerifier.ps1   # Authenticode, X.500 distinguished name, & EKU validation
+│   │   ├── Diagnostics/         # Windows CIM, Perpetual Office, M365 diagnostics
+│   │   ├── OfficeDeploy/        # ODT downloader, XML builder, deploy runner
+│   │   └── OfficeMaintenance/   # Quick/Online repair, updates, clean uninstall
+│   └── Security/                # SHA-256 integrity, Authenticode & EKU verifier
 ├── tests/
 │   ├── PSScriptAnalyzerSettings.psd1 # Strict static analysis rules
-│   └── Unit/
-│       ├── Core.Tests.ps1          # Host, TUI, Logger, Input, Process tests (23 tests)
-│       ├── Diagnostics.Tests.ps1   # Windows & Office license diagnostic tests (19 tests)
-│       ├── OfficeDeploy.Tests.ps1  # XML generation, redirect, and runner tests (22 tests)
-│       ├── OfficeMaintenance.Tests.ps1 # Quick/Online repair, update, uninstall tests (26 tests)
-│       └── Security.Tests.ps1       # Hash, Authenticode, EKU, staging tests (19 tests)
-├── README.md                    # Project documentation & usage guide
-└── LICENSE                      # MIT License
+│   └── Unit/                    # 109 Pester unit tests across 5 test suites
+├── CHANGELOG.md                 # Release history following Keep a Changelog
+├── CODE_OF_CONDUCT.md           # Community collaboration and professional standards
+├── CONTRIBUTING.md              # Developer contribution guidelines and testing instructions
+├── README.md                    # Project documentation & master index
+├── SECURITY.md                  # Vulnerability disclosure policy & SLAs
+└── SUPPORT.md                   # User support channels and FAQ
 ```
 
 ---
@@ -356,9 +386,11 @@ Invoke-ScriptAnalyzer -Path '.\src' -Recurse -Settings '.\tests\PSScriptAnalyzer
 - [x] **Milestone 2 — Licensing Diagnostics**: Windows activation status via CIM, OEM embedded key masking, perpetual Office licensing diagnostics, Microsoft 365 subscription separation, Component Store diagnostics.
 - [x] **Milestone 3 — Legitimate Office Deployment**: Hardened ODT download engine, redirect validation, strict Authenticode & X.500 publisher checks, dynamic XML generator, and deployment execution runner.
 - [x] **Milestone 4 — Office Maintenance & Repair**: Guided Quick Repair, Cloud-Streamed Online Repair with architecture detection, update triggering, clean uninstallation with data preservation advisories, and process isolation.
-- [ ] **Milestone 5 — System Troubleshooting & Repair** *(Awaiting Authorization)*: Component Store repair (`DISM /RestoreHealth`), System File Checker (`SFC /scannow`), Windows Update service and cache reset with automated backup, Network stack reset (TCP/IP, Winsock, DNS).
+- [ ] **Milestone 5 — System Troubleshooting & Repair** *(Awaiting Authorization - NOT STARTED)*: Component Store repair (`DISM /RestoreHealth`), System File Checker (`SFC /scannow`), Windows Update service and cache reset with automated backup, Network stack reset (TCP/IP, Winsock, DNS).
 - [ ] **Milestone 6 — Distribution & Edge Delivery**: Build pipeline, single-file release bundler, and Vercel edge distribution endpoints with signed release manifests.
 - [ ] **Milestone 7 — Integration Verification**: Windows Sandbox test matrix, automated verification gates, end-to-end telemetry testing.
+
+For full milestone details, see **[docs/MILESTONES.md](docs/MILESTONES.md)**.
 
 ---
 
@@ -368,9 +400,3 @@ Invoke-ScriptAnalyzer -Path '.\src' -Recurse -Settings '.\tests\PSScriptAnalyzer
 - **Local Logs Only**: Diagnostic output and session audit records remain entirely on your local machine under `%ProgramData%\WinPilot\Logs`.
 - **Product Key Privacy**: WinPilot will **never** display or log full 25-character product keys. Embedded BIOS/UEFI OEM keys are masked by default (`XXXXX-XXXXX-XXXXX-XXXXX-#####`).
 - **Intellectual Property**: WinPilot is an independent open-source tool. Microsoft, Windows, Microsoft Office, Microsoft 365, Visio, and Project are trademarks or registered trademarks of Microsoft Corporation. WinPilot is not affiliated with, endorsed by, or sponsored by Microsoft.
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
