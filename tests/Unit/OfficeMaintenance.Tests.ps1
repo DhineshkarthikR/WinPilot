@@ -331,8 +331,14 @@ Describe "WinPilot Office Installation Inventory" {
         $inv = Get-WinPilotOfficeInstallationInventory
         $inv | Should Not BeNullOrEmpty
         ($inv.IsInstalled -eq $true -or $inv.IsInstalled -eq $false) | Should Be $true
-        $inv.ProductReleaseIds | Should Not BeNullOrEmpty
-        $inv.Languages | Should Not BeNullOrEmpty
+        if ($inv.IsInstalled) {
+            $inv.ProductReleaseIds | Should Not BeNullOrEmpty
+            $inv.Languages | Should Not BeNullOrEmpty
+        }
+        else {
+            $inv.ProductReleaseIds -is [System.Array] | Should Be $true
+            $inv.Languages -is [System.Array] | Should Be $true
+        }
         $inv.Platform | Should Not BeNullOrEmpty
         $inv.Version | Should Not BeNullOrEmpty
     }

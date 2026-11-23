@@ -39,7 +39,7 @@ jobs:
       - name: Setup Compatible Pester
         shell: powershell
         run: |
-          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version -eq [Version]'4.10.1' } | Select-Object -First 1
           if (-not $pester) {
             Write-Host "Installing Pester 4.10.1 for Windows PowerShell 5.1..."
             Install-Module -Name Pester -RequiredVersion 4.10.1 -Force -SkipPublisherCheck -Scope CurrentUser
@@ -48,7 +48,10 @@ jobs:
       - name: Run Pester Unit Tests
         shell: powershell
         run: |
-          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version -eq [Version]'4.10.1' } | Select-Object -First 1
+          if (-not $pester) {
+            $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          }
           Import-Module Pester -RequiredVersion $pester.Version -Force
           Write-Host "Using Pester version: $($pester.Version) under PowerShell $($PSVersionTable.PSVersion)"
 
@@ -102,7 +105,7 @@ jobs:
       - name: Setup Compatible Pester
         shell: pwsh
         run: |
-          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version -eq [Version]'4.10.1' } | Select-Object -First 1
           if (-not $pester) {
             Write-Host "Installing Pester 4.10.1 for PowerShell 7..."
             Install-Module -Name Pester -RequiredVersion 4.10.1 -Force -SkipPublisherCheck -Scope CurrentUser
@@ -111,7 +114,10 @@ jobs:
       - name: Run Pester Unit Tests
         shell: pwsh
         run: |
-          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version -eq [Version]'4.10.1' } | Select-Object -First 1
+          if (-not $pester) {
+            $pester = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -lt 5 } | Sort-Object Version -Descending | Select-Object -First 1
+          }
           Import-Module Pester -RequiredVersion $pester.Version -Force
           Write-Host "Using Pester version: $($pester.Version) under PowerShell $($PSVersionTable.PSVersion)"
 
