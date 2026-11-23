@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B1120"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1E293B" stroke-width="0.75"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#grid)" opacity="0.6"/>
+
+  <!-- Card Frame -->
+  <rect x="80" y="60" width="1120" height="520" rx="12" fill="url(#cardGrad)" stroke="#38BDF8" stroke-width="2"/>
+
+  <!-- Terminal Top Header Bar -->
+  <rect x="80" y="60" width="1120" height="48" rx="12" fill="#1F2937"/>
+  <rect x="80" y="96" width="1120" height="12" fill="#1F2937"/>
+
+  <!-- Terminal Window Controls -->
+  <circle cx="112" cy="84" r="7" fill="#EF4444"/>
+  <circle cx="137" cy="84" r="7" fill="#F59E0B"/>
+  <circle cx="162" cy="84" r="7" fill="#10B981"/>
+
+  <!-- Terminal Title -->
+  <text x="195" y="89" fill="#94A3B8" font-family="'Segoe UI', -apple-system, sans-serif" font-size="14" font-weight="600">pwsh ~ winpilot --version v0.4.0</text>
+
+  <!-- Main Title -->
+  <text x="120" y="225" fill="#F8FAFC" font-family="'Segoe UI', -apple-system, sans-serif" font-size="72" font-weight="800" letter-spacing="1">WINPILOT</text>
+
+  <!-- Version Badge -->
+  <rect x="580" y="172" width="110" height="38" rx="6" fill="#0E7490"/>
+  <text x="635" y="197" fill="#E0F2FE" font-family="'Segoe UI', -apple-system, sans-serif" font-size="16" font-weight="700" text-anchor="middle">v0.4.0</text>
+
+  <!-- Subtitle -->
+  <text x="125" y="280" fill="#38BDF8" font-family="'Segoe UI', -apple-system, sans-serif" font-size="28" font-weight="500">Windows &amp; Office Management Toolkit</text>
+
+  <!-- Feature List -->
+  <g font-family="'Segoe UI', -apple-system, sans-serif" font-size="17" fill="#CBD5E1">
+    <text x="125" y="345">
+      <tspan fill="#34D399" font-weight="bold">[+] </tspan>Windows &amp; Office Supported Diagnostics (CIM/WMI &amp; M365)
+    </text>
+    <text x="125" y="385">
+      <tspan fill="#34D399" font-weight="bold">[+] </tspan>Legitimate Microsoft Office Deployment &amp; ODT Automation
+    </text>
+    <text x="125" y="425">
+      <tspan fill="#34D399" font-weight="bold">[+] </tspan>Cloud-Streamed Online Repair, Quick Repair &amp; Clean Removal
+    </text>
+    <text x="125" y="465">
+      <tspan fill="#34D399" font-weight="bold">[+] </tspan>Authenticode Verified | SHA-256 Validated | Local Audit Logging
+    </text>
+  </g>
+
+  <!-- Footer Info -->
+  <text x="125" y="535" fill="#64748B" font-family="'Segoe UI', -apple-system, sans-serif" font-size="14">
+    Open Source (MIT)  *  PowerShell 5.1 &amp; 7+ Dual Compatible  *  Zero Unauthorized Activation
+  </text>
+</svg>
