@@ -53,6 +53,7 @@
 - [Testing & Quality Assurance](#testing--quality-assurance)
 - [Roadmap & Milestone Status](#roadmap--milestone-status)
 - [Privacy & Compliance Statement](#privacy--compliance-statement)
+- [License](#license)
 
 ---
 
@@ -400,3 +401,11 @@ For full milestone details, see **[docs/MILESTONES.md](docs/MILESTONES.md)**.
 - **Local Logs Only**: Diagnostic output and session audit records remain entirely on your local machine under `%ProgramData%\WinPilot\Logs`.
 - **Product Key Privacy**: WinPilot will **never** display or log full 25-character product keys. Embedded BIOS/UEFI OEM keys are masked by default (`XXXXX-XXXXX-XXXXX-XXXXX-#####`).
 - **Intellectual Property**: WinPilot is an independent open-source tool. Microsoft, Windows, Microsoft Office, Microsoft 365, Visio, and Project are trademarks or registered trademarks of Microsoft Corporation. WinPilot is not affiliated with, endorsed by, or sponsored by Microsoft.
+
+---
+
+## License
+
+WinPilot is released under the **[MIT License](LICENSE)**.
+
+This license permits use, modification, distribution, and private or commercial use of the software, subject to preserving the copyright and permission notices and the warranty disclaimer set out in [LICENSE](LICENSE).

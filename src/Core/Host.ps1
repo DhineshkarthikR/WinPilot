@@ -45,7 +45,6 @@ function Get-WinPilotHost {
         CurrentUserName    = [System.Environment]::UserName
     }
 }
-
 function Test-WinPilotAdmin {
     <#
     .SYNOPSIS
