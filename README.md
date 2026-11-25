@@ -153,8 +153,8 @@ WinPilot is engineered to adhere to strict enterprise security standards and leg
 1. Open PowerShell as **Administrator** (recommended for full deployment and repair capabilities).
 2. Clone the repository and navigate to the folder:
    ```powershell
-   git clone https://github.com/winpilot/winpilot.git
-   cd winpilot
+   git clone https://github.com/DhineshkarthikR/WinPilot.git
+   cd WinPilot
    ```
 3. Launch WinPilot:
    ```powershell
